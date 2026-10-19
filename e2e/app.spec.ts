@@ -179,6 +179,8 @@ test('progress survives a reload, with the curve, rounds and lists', async ({ pa
   await expect(page.getByTestId('chart').locator('circle.pt')).toHaveCount(2);
   await expect(page.getByTestId('accuracy-chart')).toBeVisible();
   await expect(page.getByTestId('rounds').locator('tbody tr')).toHaveCount(1);
-  await expect(page.getByText('Keys to find')).toBeVisible();
-  await expect(page.getByText('Slow chunks')).toBeVisible();
+  await expect(page.getByTestId('rounds').locator('th').last()).toHaveText('Keys to find');
+  await expect(page.getByTestId('rounds').locator('tbody tr td').last()).toHaveText(/^(None|[a-z]( [a-z])*)$/);
+  await expect(page.getByTestId('hunt-list')).toBeVisible();
+  await expect(page.getByTestId('slow-list')).toBeVisible();
 });

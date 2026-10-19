@@ -18,7 +18,14 @@ function migrate(raw: unknown): Profile {
   const fresh = newProfile();
   if (!raw || typeof raw !== 'object' || (raw as Profile).version !== 1) return fresh;
   const p = raw as Profile;
-  return { ...fresh, ...p, settings: { ...fresh.settings, ...p.settings }, unlocked: { ...fresh.unlocked, ...p.unlocked } };
+  return {
+    ...fresh,
+    ...p,
+    settings: { ...fresh.settings, ...p.settings },
+    unlocked: { ...fresh.unlocked, ...p.unlocked },
+    baseline: { ...fresh.baseline, ...p.baseline },
+    testPerKey: p.testPerKey ?? [],
+  };
 }
 
 export async function loadProfile(): Promise<Profile> {

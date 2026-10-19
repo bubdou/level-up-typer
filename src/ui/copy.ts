@@ -108,7 +108,7 @@ export const COPY = {
     tests: 'Tests',
     rounds: 'Practice rounds',
     noRounds: 'Your rounds show here after you play.',
-    cols: ['Date', 'Round', 'Minutes', 'Start time', 'Per key', 'Clean'],
+    cols: ['Date', 'Round', 'Minutes', 'Start time', 'Per key', 'Clean', 'Keys to find'],
     keysToFind: 'Keys to find',
     keysToFindNote: 'Letters with long pauses before them.',
     slowChunks: 'Slow chunks',

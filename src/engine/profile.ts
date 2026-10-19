@@ -72,7 +72,10 @@ export interface Profile {
   createdAt: string;
   items: Record<string, ItemRecord>;
   letters: Record<string, LetterRecord>;
+  /** Practice chunks only; this is what "slow" compares with. */
   baseline: { start: number[]; perKey: number[] };
+  /** Ms per key from test words. Used for letter judgments until practice has its own baseline, never for "slow". */
+  testPerKey: number[];
   unlocked: Record<TrackId, number>;
   /** Most-missed keys from the last test, practiced in the next round's Keys segment. */
   pendingTestKeys: string[];
@@ -88,6 +91,7 @@ export function newProfile(now = new Date()): Profile {
     items: {},
     letters: {},
     baseline: { start: [], perKey: [] },
+    testPerKey: [],
     unlocked: { chunks: 1, words: 1, flow: 1 },
     pendingTestKeys: [],
     rounds: [],
@@ -122,9 +126,18 @@ export function slowBaseline(p: Profile): { start: number | null; perKey: number
   return { start: ok(p.baseline.start), perKey: ok(p.baseline.perKey) };
 }
 
-/** Personal ms per key for letter judgments. */
+export function addTestPerKey(p: Profile, perKey: number) {
+  pushCapped(p.testPerKey, perKey, CONFIG.baselineWindow);
+}
+
+/**
+ * Personal ms per key for letter judgments. Practice data once it has enough chunks;
+ * before that, practice and test data together, so a first test can find hunting letters.
+ */
 export function perKeyBaseline(p: Profile): number | null {
-  return p.baseline.perKey.length >= CONFIG.perKeyBaselineMinSamples ? median(p.baseline.perKey) : null;
+  if (p.baseline.perKey.length >= CONFIG.baselineMinChunks) return median(p.baseline.perKey);
+  const all = [...p.baseline.perKey, ...(p.testPerKey ?? [])];
+  return all.length >= CONFIG.perKeyBaselineMinSamples ? median(all) : null;
 }
 
 export type LetterState = 'hunt' | 'learning' | 'known';

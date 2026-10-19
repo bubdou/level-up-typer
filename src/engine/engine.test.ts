@@ -209,6 +209,32 @@ describe('revisits', () => {
     }
   });
 
+  it('keeps scheduled revisits when the round moves to the next segment', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const p = newProfile();
+      const r = roundOf(p, { seed, segments: [{ kind: 'chunks', ms: 5000 }, { kind: 'chunks', ms: 60 * 60_000 }] });
+      let t = 0;
+      // run the clock almost to the end of the first segment
+      while (r.view(t).activeMs < 4900) {
+        t += 50;
+        r.tick(t);
+      }
+      const target = r.view(t).text;
+      t = typeCurrent(r, t, { wrong: true });
+      for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+      expect(r.view(t).segIndex, `seed ${seed}`).toBe(1);
+      t += CONFIG.segmentBreakMs;
+      r.tick(t);
+      const seen: string[] = [];
+      for (let i = 0; i < 13; i++) {
+        seen.push(r.view(t).text);
+        t = typeCurrent(r, t);
+      }
+      expect(seen[4], `seed ${seed}`).toBe(target);
+      expect(seen[12], `seed ${seed}`).toBe(target);
+    }
+  });
+
   it('brings an unfixed chunk back after the 2nd chunk', () => {
     const r = roundOf(newProfile(), { seed: 3 });
     const target = r.view(0).text;
@@ -589,8 +615,32 @@ describe('test mode', () => {
     expect(Object.values(rec.errorsByKey).reduce((a, b) => a + b, 0)).toBe(rec.wrongKeys);
     expect(p.pendingTestKeys.length).toBeLessThanOrEqual(3);
     expect(p.pendingTestKeys.every((k) => /^[a-z]$/.test(k))).toBe(true);
-    expect(p.baseline.perKey.length).toBeGreaterThan(0);
+    expect(p.testPerKey.length).toBeGreaterThan(0);
     expect(Object.keys(p.letters).length).toBeGreaterThan(0);
+  });
+
+  it('keeps test data out of the slow baseline, so the first round only builds it', () => {
+    const p = newProfile();
+    const run = new TestRun(1, seeded(6));
+    let t = 0;
+    while (!run.tick(t)) {
+      run.key(run.expected, t);
+      t += 100;
+    }
+    saveTest(p, run);
+    expect(p.baseline.start).toEqual([]);
+    expect(p.baseline.perKey).toEqual([]);
+    const r = roundOf(p);
+    t = 0;
+    for (let i = 0; i < CONFIG.baselineMinChunks; i++) t = typeCurrent(r, t, { start: 2000, gap: 400 });
+    expect(r.results.every((x) => x.outcome === 'smooth')).toBe(true);
+  });
+
+  it('can still find hunting letters from a first test', () => {
+    const p = newProfile();
+    p.testPerKey = Array(30).fill(200);
+    p.letters.q = { pauses: Array(5).fill(900), knownStreak: 0 };
+    expect(huntLetters(p)).toEqual(['q']);
   });
 
   it('compares with the last test of the same length and spots a new best', () => {
@@ -616,7 +666,16 @@ describe('progress chart', () => {
     const s = chartSeries(tests, 1);
     expect(s.map((p) => p.wpm)).toEqual([10, 13, 16, 22]);
     expect(s.map((p) => p.avg)).toEqual([10, 11.5, 13, 17]);
-    expect(chartHeadline(s)).toEqual({ kind: 'up', wpm: 4 });
+    // fewer than 6 tests: latest compared with the first
+    expect(chartHeadline(s)).toEqual({ kind: 'up', wpm: 12 });
+  });
+
+  it('compares the latest with the first below 6 tests, and 3-test averages from 6 on', () => {
+    expect(chartHeadline(chartSeries([mk('2026-10-01', 1, 10), mk('2026-10-03', 1, 15)], 1))).toEqual({ kind: 'up', wpm: 5 });
+    expect(chartHeadline(chartSeries([mk('2026-10-01', 1, 12), mk('2026-10-03', 1, 15), mk('2026-10-05', 1, 12)], 1))).toEqual({ kind: 'best', best: 15 });
+    const six = [10, 20, 12, 14, 13, 13].map((w, i) => mk(`2026-10-0${i + 1}`, 1, w));
+    // last 3 average 13.33 vs first 3 average 14: not up, even though the latest beats the first
+    expect(chartHeadline(chartSeries(six, 1))).toEqual({ kind: 'best', best: 20 });
   });
 
   it('says "Some days are slower" when the average is not up', () => {

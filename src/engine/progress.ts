@@ -22,12 +22,17 @@ export function chartSeries(tests: readonly TestRecord[], minutes: number): Char
 
 export type Headline = { kind: 'up'; wpm: number } | { kind: 'best'; best: number } | null;
 
-/** The chart title only says true things: "Up N wpm" only when the last 3 average beats the first 3. */
+/**
+ * The chart title only says true things. From 6 tests on, "Up N wpm" needs the last 3 average
+ * to beat the first 3. With fewer, those groups overlap, so the latest test is compared with the first.
+ */
 export function chartHeadline(points: readonly ChartPoint[]): Headline {
   if (points.length < 2) return null;
   const w = points.map((p) => p.wpm);
   const n = CONFIG.chartAverageWindow;
-  const up = Math.round(mean(w.slice(-n))! - mean(w.slice(0, n))!);
+  const up = Math.round(
+    w.length >= 2 * n ? mean(w.slice(-n))! - mean(w.slice(0, n))! : w[w.length - 1] - w[0],
+  );
   if (up >= 1) return { kind: 'up', wpm: up };
   return { kind: 'best', best: Math.max(...w) };
 }

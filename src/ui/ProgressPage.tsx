@@ -39,6 +39,7 @@ export function ProgressPage({ profile, go, initialMinutes }: ScreenProps & { in
                     <td>{r.medStart != null ? `${(r.medStart / 1000).toFixed(2)} s` : '–'}</td>
                     <td>{r.medPerKey != null ? `${r.medPerKey} ms` : '–'}</td>
                     <td>{r.cleanRate}%</td>
+                    <td>{r.huntLetters.length ? r.huntLetters.join(' ') : COPY.progress.none}</td>
                   </tr>
                 ))}
               </tbody>

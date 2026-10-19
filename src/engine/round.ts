@@ -308,6 +308,8 @@ export class Round {
   }
 
   private startSegment(i: number, now: number, withBreak: boolean) {
+    // Revisits already scheduled keep their place when the segment changes.
+    const carried = this.upcoming.map((e, idx) => ({ e, idx })).filter((x) => x.e.revisit);
     this.segIndex = i;
     this.segStartMs = this.activeMs;
     this.chunkInSegment = 0;
@@ -318,6 +320,14 @@ export class Round {
       const [first, ...rest] = this.expandSentence(this.current);
       this.current = first;
       this.upcoming.push(...rest);
+    }
+    for (const { e, idx } of carried) {
+      if (idx === 0) {
+        this.upcoming.unshift(this.current);
+        this.current = e;
+      } else {
+        this.insertRevisit(e, idx - 1);
+      }
     }
     const t = withBreak ? now + CONFIG.segmentBreakMs : now;
     this.interstitialUntil = withBreak ? t : 0;
@@ -523,18 +533,20 @@ export class Round {
    */
   private scheduleRevisits(entry: Entry, gaps: readonly number[]) {
     const revisit: Entry = { text: entry.text, itemKey: entry.itemKey, mode: entry.mode, revisit: true };
-    for (const gap of gaps) {
-      this.fill(gap + 2);
-      let idx = gap;
-      while (idx < this.upcoming.length && this.upcoming[idx - 1]?.sentence && !this.upcoming[idx - 1].sentence!.last) idx++;
-      this.upcoming.splice(idx, 0, revisit);
-      for (const j of [idx - 1, idx + 1]) {
-        const nb = this.upcoming[j];
-        if (!nb || nb.text !== revisit.text || nb.revisit || nb.sentence) continue;
-        const exclude = new Set([revisit.text, this.upcoming[j - 1]?.text, this.upcoming[j + 1]?.text].filter((t): t is string => !!t));
-        const replacement = this.generate(exclude);
-        if (!replacement.sentence) this.upcoming[j] = replacement;
-      }
+    for (const gap of gaps) this.insertRevisit(revisit, gap);
+  }
+
+  /** Insert a revisit at queue index `idx` (that many chunks come before it). */
+  private insertRevisit(revisit: Entry, idx: number) {
+    this.fill(idx + 2);
+    while (idx < this.upcoming.length && this.upcoming[idx - 1]?.sentence && !this.upcoming[idx - 1].sentence!.last) idx++;
+    this.upcoming.splice(idx, 0, revisit);
+    for (const j of [idx - 1, idx + 1]) {
+      const nb = this.upcoming[j];
+      if (!nb || nb.text !== revisit.text || nb.revisit || nb.sentence) continue;
+      const exclude = new Set([revisit.text, this.upcoming[j - 1]?.text, this.upcoming[j + 1]?.text].filter((t): t is string => !!t));
+      const replacement = this.generate(exclude);
+      if (!replacement.sentence) this.upcoming[j] = replacement;
     }
   }
 

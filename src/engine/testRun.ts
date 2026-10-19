@@ -3,7 +3,7 @@ import { LETTERS, TEST_POOL } from './content';
 import type { Rng } from './picker';
 import { pickOne } from './picker';
 import type { Profile, TestRecord } from './profile';
-import { addBaseline, addLetterPause } from './profile';
+import { addLetterPause, addTestPerKey } from './profile';
 import { testScore } from './stats';
 
 export type TestKeyResult = 'ignored' | 'correct' | 'wrong';
@@ -151,7 +151,7 @@ export function saveTest(p: Profile, run: TestRun, wallNow: number = Date.now())
   };
   const m = run.measurements();
   for (const lp of m.letterPauses) addLetterPause(p, lp.letter, lp.ms);
-  for (const pk of m.perKeys) addBaseline(p, null, pk);
+  for (const pk of m.perKeys) addTestPerKey(p, pk);
   p.pendingTestKeys = run.topMissed().filter((k) => LETTERS.includes(k));
   p.tests.push(record);
   return record;
