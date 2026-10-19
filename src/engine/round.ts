@@ -88,6 +88,8 @@ export interface RoundView {
   limitMs: number;
   /** Index of the current chunk within its segment (0 = first). */
   chunkInSegment: number;
+  /** Changes every time a chunk (or a repair try) starts. */
+  seq: number;
 }
 
 export type KeyResult = 'ignored' | 'correct' | 'wrong' | 'done';
@@ -123,6 +125,7 @@ export class Round {
   private charSince = 0;
   private errorBeforePause = false;
   private errorTick = 0;
+  private seq = 0;
   private repair: Repair | null = null;
   private toast: RoundView['toast'] = null;
 
@@ -182,6 +185,7 @@ export class Round {
       activeMs: this.activeMs,
       limitMs: this.limitMs,
       chunkInSegment: this.chunkInSegment,
+      seq: this.seq,
     };
   }
 
@@ -294,6 +298,7 @@ export class Round {
   }
 
   private resetChunk(now: number, keepError = false) {
+    this.seq++;
     this.pos = 0;
     this.strokes = [];
     this.shownAt = now;
