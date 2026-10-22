@@ -8,6 +8,16 @@ export async function open(page: Page, query = '') {
   await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
 }
 
+/**
+ * Stop the fake clock from also moving with real time, so only runFor moves it. Use it before
+ * checking anything that lasts a fixed time (hint delays, pops, bubbles): a slow runner would
+ * otherwise let it pass while the test waits.
+ */
+export async function freezeClock(page: Page) {
+  const t = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(t + 1000);
+}
+
 export const wrongFor = (ch: string) => (ch === 'q' ? 'w' : 'q');
 
 export interface PracticeState {

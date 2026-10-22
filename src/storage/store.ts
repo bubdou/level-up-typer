@@ -65,19 +65,39 @@ export async function saveProfile(p: Profile): Promise<void> {
 const GAME_KEY = 'game-v1';
 const GAME_LS_KEY = 'level-up-typer:game-v1';
 
-/** Null when there is no game document yet (a new player, or a profile from before M2). */
+const GAME_BROKEN_KEY = 'game-v1-unreadable';
+
+/**
+ * Null when there is no game document yet (a new player, or a profile from before M2). A
+ * document that exists but cannot be read (damaged, or from a version this code does not know)
+ * is copied aside first, so starting over never overwrites the only copy.
+ */
 export async function loadGame(): Promise<GameState | null> {
+  let raw: unknown = null;
   try {
-    const v = await get(GAME_KEY, store());
-    if (v) return migrateGame(v);
+    raw = (await get(GAME_KEY, store())) ?? null;
   } catch {
     // fall through to localStorage
   }
+  if (raw === null) {
+    try {
+      const s = localStorage.getItem(GAME_LS_KEY);
+      if (s) raw = JSON.parse(s);
+    } catch {
+      // ignore
+    }
+  }
+  if (raw === null) return null;
+  const g = migrateGame(raw);
+  if (g) return g;
   try {
-    const s = localStorage.getItem(GAME_LS_KEY);
-    if (s) return migrateGame(JSON.parse(s));
+    await set(GAME_BROKEN_KEY, raw, store());
   } catch {
-    // ignore
+    try {
+      localStorage.setItem(GAME_BROKEN_KEY, JSON.stringify(raw));
+    } catch {
+      // nothing else we can do
+    }
   }
   return null;
 }

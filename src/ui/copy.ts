@@ -221,7 +221,7 @@ export const COPY = {
       combo: { name: 'Combo', what: '10 clean chunks in a row: your points double until a wrong key.', trains: 'Trains: accuracy first' },
       spark: { name: 'Spark', what: '+5 when you start a chunk faster than you usually do.', trains: 'Trains: start time (whole words)' },
       keyFinder: { name: 'Key Finder', what: '+50 when a key you looked for becomes easy.', trains: 'Trains: keys without looking' },
-      flowChain: { name: 'Flow Chain', what: 'In Flow, 5 words in a row with no long stop: +10.', trains: 'Trains: word to word' },
+      flowChain: { name: 'Flow Chain', what: 'In Flow, 5 in a row with no long stop: +10.', trains: 'Trains: word to word' },
       shield: { name: 'Shield', what: 'Once a round, a wrong key keeps your Combo. You still fix the chunk.', trains: 'Keeps a Combo safe' },
     } as Record<string, { name: string; what: string; trains: string }>,
     looks: { classic: 'Classic', ocean: 'Ocean', forest: 'Forest', night: 'Night' } as Record<string, string>,

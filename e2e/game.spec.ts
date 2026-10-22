@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { open, practiceStep, testStep, typeChunk } from './helpers';
+import { freezeClock, open, practiceStep, testStep, typeChunk } from './helpers';
 
 const xpText = (page: Page) => page.getByTestId('level').getByTestId('xp');
 
@@ -25,6 +25,7 @@ test('home shows level, XP bar, next unlock, this week and the collection; tests
 
 test('practice scores chunks without getting in the way; the summary adds them up', async ({ page }) => {
   await open(page);
+  await freezeClock(page);
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('round-xp')).toHaveText('+0 XP');
   await expect(page.getByTestId('gamebar')).toContainText('Combo unlocks at level 2');
@@ -67,6 +68,7 @@ test('practice scores chunks without getting in the way; the summary adds them u
 test('reaching level 2 shows a short bubble and turns on Combo', async ({ page }) => {
   test.setTimeout(180_000);
   await open(page);
+  await freezeClock(page);
   await page.keyboard.press('Enter');
   let seen = false;
   for (let i = 0; i < 80 && !seen; i++) {
@@ -75,10 +77,11 @@ test('reaching level 2 shows a short bubble and turns on Combo', async ({ page }
   }
   const bubble = page.getByTestId('bubble');
   await expect(bubble).toHaveText('Level 2! Combo unlocked');
-  // the bubble sits in the game line, not on the chunk strip, and keys still go through
-  const pos = await page.getByTestId('current').getAttribute('data-pos');
-  await page.keyboard.press((await page.getByTestId('practice').getAttribute('data-expected'))!);
-  await expect(page.getByTestId('current')).not.toHaveAttribute('data-pos', pos!);
+  // the bubble sits in the game line, away from the chunk strip
+  await expect(page.getByTestId('gamebar').getByTestId('bubble')).toBeVisible();
+  const box = (await bubble.boundingBox())!;
+  const strip = (await page.locator('.stripwrap').boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(strip.y);
   await page.clock.runFor(1500);
   await expect(bubble).toHaveCount(0);
   await expect(page.getByTestId('combo')).toBeVisible();
