@@ -43,9 +43,15 @@ test('screens', async ({ page }) => {
   for (let i = 0; i < 3000; i++) if (!(await practiceStep(page, 250))) break;
   await shot('10-summary');
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Progress' }).click();
+  await shot('10b-home-after-round');
+  await page.getByRole('button', { name: 'Collection', exact: true }).click();
+  await page.locator('.cset:not(:disabled)').first().click();
+  await shot('10c-collection');
+  await page.getByRole('button', { name: 'Power-ups', exact: true }).click();
+  await shot('10d-power-ups');
+  await page.getByRole('button', { name: 'Progress', exact: true }).click();
   await shot('11-progress');
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await shot('12-settings');
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.getByRole('button', { name: 'Home' }).click();

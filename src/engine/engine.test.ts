@@ -341,6 +341,36 @@ describe('slow chunks', () => {
   });
 });
 
+describe('fields for the game layer (M2)', () => {
+  it('chunk events carry the segment, the start time and whether it beat the personal median', () => {
+    const events: ChunkEvent[] = [];
+    const fresh = roundOf(newProfile(), { events });
+    typeCurrent(fresh, 0, { start: 200 });
+    expect(events.at(-1)).toMatchObject({ type: 'smooth', segment: 'chunks', start: 200, medianStart: null, quickStart: null });
+
+    const p = withBaseline(newProfile(), 300, 150);
+    const r = roundOf(p, { events });
+    let t = typeCurrent(r, 0, { start: 250 });
+    expect(events.at(-1)).toMatchObject({ type: 'smooth', start: 250, medianStart: 300, quickStart: true });
+    t = typeCurrent(r, t, { start: 300 });
+    expect(events.at(-1)).toMatchObject({ quickStart: false });
+    typeCurrent(r, t, { wrong: true });
+    expect(events.at(-1)).toMatchObject({ type: 'error', segment: 'chunks' });
+  });
+
+  it('the round summary keeps the hunting letters from the start of the round', () => {
+    const p = newProfile();
+    p.testPerKey = Array(10).fill(150);
+    p.letters.q = { pauses: Array(10).fill(900), knownStreak: 0 };
+    const r = roundOf(p);
+    typeCurrent(r, 0);
+    p.letters.q.pauses = Array(10).fill(150);
+    const s = r.finish()!;
+    expect(s.huntLettersAtStart).toEqual(['q']);
+    expect(s.huntLetters).toEqual([]);
+  });
+});
+
 describe('letters and key hints', () => {
   it('switches between hunting, learning and known by the rule table', () => {
     const p = withBaseline(newProfile(), 300, 200);

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { open, practiceStep, testStep, typeChunk, wrongFor } from './helpers';
+import { freezeClock, open, practiceStep, testStep, typeChunk, wrongFor } from './helpers';
 
 test('test flow with the keyboard only: home, 1 min test, result, home', async ({ page }) => {
   await open(page);
@@ -128,6 +128,7 @@ test('leaving the window stops a test; it never reaches the chart', async ({ pag
 
 test('key hint lights after 1 s for a new learner, at once in Always mode', async ({ page }) => {
   await open(page);
+  await freezeClock(page);
   await page.keyboard.press('Enter');
   await page.clock.runFor(900);
   await expect(page.locator('.key.lit')).toHaveCount(0);

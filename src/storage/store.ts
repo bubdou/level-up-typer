@@ -1,6 +1,8 @@
 import { createStore, get, set } from 'idb-keyval';
 import type { Profile } from '../engine';
 import { newProfile } from '../engine';
+import type { GameState } from '../game';
+import { migrateGame } from '../game';
 
 // The whole profile is one small document. IndexedDB first; localStorage if IndexedDB fails
 // (for example some private windows).
@@ -54,6 +56,62 @@ export async function saveProfile(p: Profile): Promise<void> {
   }
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(copy));
+  } catch {
+    // nothing else we can do
+  }
+}
+
+// The game layer keeps its own document next to the profile, so the engine's data never holds game data.
+const GAME_KEY = 'game-v1';
+const GAME_LS_KEY = 'level-up-typer:game-v1';
+
+const GAME_BROKEN_KEY = 'game-v1-unreadable';
+
+/**
+ * Null when there is no game document yet (a new player, or a profile from before M2). A
+ * document that exists but cannot be read (damaged, or from a version this code does not know)
+ * is copied aside first, so starting over never overwrites the only copy.
+ */
+export async function loadGame(): Promise<GameState | null> {
+  let raw: unknown = null;
+  try {
+    raw = (await get(GAME_KEY, store())) ?? null;
+  } catch {
+    // fall through to localStorage
+  }
+  if (raw === null) {
+    try {
+      const s = localStorage.getItem(GAME_LS_KEY);
+      if (s) raw = JSON.parse(s);
+    } catch {
+      // ignore
+    }
+  }
+  if (raw === null) return null;
+  const g = migrateGame(raw);
+  if (g) return g;
+  try {
+    await set(GAME_BROKEN_KEY, raw, store());
+  } catch {
+    try {
+      localStorage.setItem(GAME_BROKEN_KEY, JSON.stringify(raw));
+    } catch {
+      // nothing else we can do
+    }
+  }
+  return null;
+}
+
+export async function saveGame(g: GameState): Promise<void> {
+  const copy = JSON.parse(JSON.stringify(g)) as GameState;
+  try {
+    await set(GAME_KEY, copy, store());
+    return;
+  } catch {
+    // fall back
+  }
+  try {
+    localStorage.setItem(GAME_LS_KEY, JSON.stringify(copy));
   } catch {
     // nothing else we can do
   }
