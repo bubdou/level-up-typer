@@ -38,8 +38,12 @@ export interface RoundPoints {
   total: number;
 }
 
+export type Medal = 'gold' | 'silver' | 'bronze';
+
 export interface GameSettings {
   look: LookId;
+  /** The usual-pace line in tests. */
+  paceLine: boolean;
   sounds: boolean;
   animations: boolean;
   weekGoalDays: number;
@@ -59,6 +63,8 @@ export interface GameState {
    * engine clears an item's mastery after a later miss. Mastered XP is paid once per key.
    */
   everMastered: string[];
+  /** Best medal per Collection set, by set id ("chunks-0"). */
+  medals: Record<string, Medal>;
   /** Letter to the ISO time Key Finder last paid for it. */
   keyFinder: Record<string, string>;
   /** Set once, when the game first meets a profile. */
@@ -73,9 +79,10 @@ export function newGameState(): GameState {
     rounds: {},
     weekGoalsPaid: [],
     everMastered: [],
+    medals: {},
     keyFinder: {},
     headStart: null,
-    settings: { look: 'classic', sounds: true, animations: true, weekGoalDays: GAME_CONFIG.weekGoalDaysDefault },
+    settings: { look: 'classic', paceLine: true, sounds: true, animations: true, weekGoalDays: GAME_CONFIG.weekGoalDaysDefault },
   };
 }
 
@@ -89,6 +96,7 @@ export function migrateGame(raw: unknown): GameState | null {
     rounds: g.rounds ?? {},
     weekGoalsPaid: g.weekGoalsPaid ?? [],
     everMastered: g.everMastered ?? [],
+    medals: g.medals ?? {},
     keyFinder: g.keyFinder ?? {},
     settings: { ...fresh.settings, ...g.settings },
   };

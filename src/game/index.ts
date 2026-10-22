@@ -6,3 +6,4 @@ export * from './scorer';
 export * from './finish';
 export * from './week';
 export * from './collection';
+export * from './challenge';

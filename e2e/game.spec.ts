@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { LETTER_PAIRS } from '../src/data/wordlists';
 import { freezeClock, open, practiceStep, testStep, typeChunk } from './helpers';
 
 const xpText = (page: Page) => page.getByTestId('level').getByTestId('xp');
@@ -153,4 +154,97 @@ test('an M1 profile gets a head start of 300 XP per round, once', async ({ page 
   await expect(page.getByTestId('head-start')).toHaveText('Head start: +300 XP for each round you played.');
   await page.reload();
   await expect(xpText(page)).toHaveText('300 / 500 XP');
+});
+
+/** Change the stored profile, as if it had been played this far, then reload. */
+async function editProfile(page: Page, fn: string) {
+  await page.evaluate(
+    (body) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('level-up-typer');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('kv', 'readwrite');
+          const store = tx.objectStore('kv');
+          const get = store.get('profile-v1');
+          get.onsuccess = () => {
+            const p = get.result;
+            new Function('p', body)(p);
+            store.put(p, 'profile-v1');
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    fn,
+  );
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
+}
+
+test('a set with 8 of 10 mastered can be challenged for a medal (M2b)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await open(page);
+  // play one chunk so a profile is stored, then mark 8 letter pairs mastered
+  await page.keyboard.press('Enter');
+  await typeChunk(page);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Enter');
+  const keys = LETTER_PAIRS.slice(0, 8).map((t) => `pairs:${t}`);
+  await editProfile(
+    page,
+    `for (const k of ${JSON.stringify(keys)}) p.items[k] = { history: [], seen: 2, smoothRounds: ['a', 'b'], mastered: true, weak: false };`,
+  );
+  await expect(page.getByTestId('home-collection')).toHaveText('8of 476 mastered');
+
+  await page.getByRole('button', { name: 'Collection', exact: true }).click();
+  await page.getByRole('button', { name: /Letter pairs, set 1/ }).click();
+  await page.getByTestId('challenge').click();
+  await expect(page.getByTestId('practice')).toBeVisible();
+  await expect(page.locator('.topbar .mode')).toHaveText('Letter pairs, set 1 challenge');
+  await expect(page.locator('.topbar')).toContainText('0:45');
+  const allowed = new Set(LETTER_PAIRS.slice(0, 10));
+  for (let i = 0; i < 2000; i++) {
+    const text = await page.evaluate(() => document.querySelector('[data-testid="current"]')?.getAttribute('data-text') ?? null);
+    if (text !== null) expect(allowed.has(text)).toBe(true);
+    if (!(await practiceStep(page, 150))) break;
+  }
+  await expect(page.getByTestId('challenge-result')).toBeVisible();
+  await expect(page.getByTestId('medal')).toHaveText('Gold');
+  await expect(page.getByText('New best medal!')).toBeVisible();
+  if (process.env.TMP_SHOT) await page.screenshot({ path: `${process.env.TMP_SHOT}/m2b-challenge-result.png`, fullPage: true });
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('collection')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Letter pairs, set 1: .*Gold/ })).toBeVisible();
+  // a challenge is not a round
+  await page.getByRole('button', { name: 'Progress', exact: true }).click();
+  await expect(page.getByTestId('rounds').locator('tbody tr')).toHaveCount(1);
+});
+
+test('after 3 tests, a gold line shows the usual pace; beating it says so (M2b)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await open(page);
+  for (let n = 0; n < 3; n++) {
+    await page.keyboard.press('t');
+    await expect(page.getByTestId('pace-key')).toHaveCount(0);
+    for (let i = 0; i < 40; i++) await testStep(page, i, 0, 200);
+    await page.clock.runFor(61_000);
+    await expect(page.getByTestId('test-result')).toBeVisible();
+    await expect(page.getByTestId('pace-ahead')).toHaveCount(0);
+    await page.keyboard.press('Enter');
+  }
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('pace-key')).toContainText('Your usual pace');
+  for (let i = 0; i < 80; i++) await testStep(page, i, 0, 200);
+  await expect(page.locator('.testtext [data-ghost]')).toHaveCount(1);
+  await page.clock.runFor(61_000);
+  await expect(page.getByTestId('pace-ahead')).toHaveText('Ahead of your usual pace');
+  await page.keyboard.press('Enter');
+  // the line can be switched off
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Usual-pace line in tests').uncheck();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('pace-key')).toHaveCount(0);
 });

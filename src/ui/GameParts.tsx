@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import type { RoundSummary } from '../engine';
 import type { GameState, PowerUpId } from '../game';
-import { GAME_CONFIG, levelProgress, nextUnlock, weekDays, weekStreak } from '../game';
+import { GAME_CONFIG, levelOf, levelProgress, nextUnlock, unlocksBetween, weekDays, weekStreak } from '../game';
 import { COPY, unlockName } from './copy';
 
 const ICON_PATHS: Record<PowerUpId | 'look', ReactNode> = {
@@ -95,5 +95,23 @@ export function WeekDots({ game, rounds, now }: { game: GameState; rounds: reado
       </span>
       {streak >= 2 && <span className="note">{COPY.game.weekStreak(streak)}</span>}
     </div>
+  );
+}
+
+/** A card for each power-up or look unlocked between two XP totals. */
+export function UnlockCards({ fromXp, toXp }: { fromXp: number; toXp: number }) {
+  return (
+    <>
+      {unlocksBetween(levelOf(fromXp), levelOf(toXp)).map((u) => (
+        <div key={u.id} className="unlock" data-testid="unlock">
+          <div className="ic"><GameIcon id={u.kind === 'powerUp' ? u.id : 'look'} /></div>
+          <div>
+            <div className="label">{u.kind === 'powerUp' ? COPY.game.newPowerUp(u.level) : COPY.game.newLook(u.level)}</div>
+            <h2>{unlockName(u)}</h2>
+            <p className="muted">{u.kind === 'powerUp' ? COPY.game.powerUps[u.id].what : COPY.game.newLookText}</p>
+          </div>
+        </div>
+      ))}
+    </>
   );
 }

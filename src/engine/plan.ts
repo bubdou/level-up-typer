@@ -3,13 +3,20 @@ import type { StageId } from './content';
 import type { Profile } from './profile';
 import { keysLetters } from './profile';
 
-export type SegmentKind = 'keys' | 'chunks' | 'flow' | 'chosen';
+export type SegmentKind = 'keys' | 'chunks' | 'flow' | 'chosen' | 'set';
 
 export interface Segment {
   kind: SegmentKind;
   ms: number;
   /** Only for 'chosen'. */
   stage?: StageId;
+  /** Only for 'set': the item keys of one batch, for a set challenge. */
+  items?: string[];
+}
+
+/** A set challenge: one segment that only uses the given items. */
+export function planChallenge(itemKeys: readonly string[]): Segment[] {
+  return [{ kind: 'set', ms: CONFIG.challengeMs, items: [...itemKeys] }];
 }
 
 /**

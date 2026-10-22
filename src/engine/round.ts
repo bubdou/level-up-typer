@@ -71,7 +71,7 @@ export interface RoundOptions {
   /** Wall clock for dates and round ids. */
   wallClock?: () => number;
   onEvent?: (e: ChunkEvent) => void;
-  /** Use a fixed plan instead of planRound (tests). */
+  /** Use a fixed plan instead of planRound (tests, and set challenges via planChallenge). */
   segments?: Segment[];
 }
 
@@ -110,6 +110,12 @@ export class Round {
   readonly segments: Segment[];
   readonly id: string;
   readonly limitMs: number;
+  /**
+   * A set challenge. Its chunks are judged and repaired like any round and misses count as usual,
+   * but a smooth result does not count toward mastery (two challenges in a row would otherwise
+   * master items without a later encounter), and it is not stored as a round.
+   */
+  readonly challenge: boolean;
   private p: Profile;
   private rng: Rng;
   private wall: () => number;
@@ -165,6 +171,7 @@ export class Round {
     this.id = `r${this.wall().toString(36)}${Math.floor(this.rng() * 1e6).toString(36)}`;
     this.segments = opts.segments ?? planRound(profile, opts.minutes, opts.choose ?? null);
     this.limitMs = this.segments.reduce((a, s) => a + s.ms, 0);
+    this.challenge = this.segments.some((s) => s.kind === 'set');
     this.huntAtStart = huntLetters(profile);
     this.hunt = new Set(this.huntAtStart);
     this.keysLetters = keysLetters(profile);
@@ -262,12 +269,13 @@ export class Round {
     if (this.finished) return this.summary;
     this.finished = true;
     if (this.results.length === 0) return null;
-    updateKnownStreaks(this.p);
+    if (!this.challenge) updateKnownStreaks(this.p);
     if (this.segments.some((s) => s.kind === 'keys')) this.p.pendingTestKeys = [];
     const clean = this.results.filter((r) => r.outcome !== 'error').length;
     const round = (v: number | null) => (v === null ? null : Math.round(v));
     this.summary = {
       id: this.id,
+      kind: this.challenge ? 'challenge' : 'round',
       date: new Date(this.wall()).toISOString(),
       minutes: this.activeMs / 60_000,
       segments: this.segments.map((s) => (s.kind === 'chosen' ? s.stage! : s.kind)),
@@ -282,7 +290,7 @@ export class Round {
       flowMedStart: round(median(this.flowStarts)),
       repairs: this.repairs,
     };
-    this.p.rounds.push(this.summary);
+    if (!this.challenge) this.p.rounds.push(this.summary);
     return this.summary;
   }
 
@@ -351,6 +359,10 @@ export class Round {
 
   private configureGenerator(seg: Segment) {
     if (seg.kind === 'keys') return this.useKeys(seg);
+    if (seg.kind === 'set') {
+      const pool = (seg.items ?? []).map((k) => ITEM_BY_KEY.get(k)).filter((i): i is Item => !!i);
+      return pool[0]?.track === 'flow' ? this.useFlowItems(pool) : this.useChunkPool(() => pool, false);
+    }
     if (seg.kind === 'chosen') {
       const stage = stageById(seg.stage!);
       const pool = stage.items.map((text) => ITEM_BY_KEY.get(`${stage.id}:${text}`)!);
@@ -500,6 +512,7 @@ export class Round {
       rec.weak = true;
       return;
     }
+    if (this.challenge) return;
     const fixedAt = this.fixedAt.get(key);
     const tooSoon = fixedAt !== undefined && n - fixedAt - 1 <= CONFIG.masteryIgnoreAfterFix;
     if (tooSoon) return;

@@ -300,3 +300,16 @@ select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid
   .zone { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .gbubble { margin-left: 0; }
 }
+
+/* M2b: medals and the usual-pace line */
+.cset { position: relative; }
+.medal { position: absolute; top: -6px; right: -6px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--bg); }
+.medal.gold, .medalbig.gold { background: #e7b52c; }
+.medal.silver, .medalbig.silver { background: #b8c0cf; }
+.medal.bronze, .medalbig.bronze { background: #c98a52; }
+.medalbig { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #2a1d00; flex: none; }
+.row.between { justify-content: space-between; }
+.testtext span.ghost { box-shadow: inset 0 -3px 0 var(--xp); }
+.pacekey { display: flex; align-items: center; gap: 6px; margin: 0; }
+.pacekey i { width: 18px; height: 3px; background: var(--xp); display: inline-block; border-radius: 2px; flex: none; }
+.ahead { font-weight: 600; color: var(--xp); }

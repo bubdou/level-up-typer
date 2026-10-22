@@ -64,6 +64,10 @@ export function SettingsPage({ profile, go, changed, update, game, updateGame }:
         {COPY.settings.animations}
         <input id="anim" type="checkbox" checked={gs.animations} onChange={(e) => updateGame((g) => (g.settings.animations = e.target.checked))} />
       </label>
+      <label htmlFor="pace">
+        {COPY.settings.paceLine}
+        <input id="pace" type="checkbox" checked={gs.paceLine} onChange={(e) => updateGame((g) => (g.settings.paceLine = e.target.checked))} />
+      </label>
       <label htmlFor="week">
         {COPY.settings.weekGoal}
         <select id="week" value={gs.weekGoalDays} onChange={(e) => updateGame((g) => (g.settings.weekGoalDays = Number(e.target.value)))}>

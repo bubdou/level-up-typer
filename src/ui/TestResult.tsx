@@ -9,9 +9,11 @@ interface Props {
   record: TestRecord;
   comparison: TestComparison;
   missed: string[];
+  /** The usual pace the test ran against, if the line was shown. */
+  pace?: number | null;
 }
 
-export function TestResult({ profile, go, record, comparison, missed }: ScreenProps & Props) {
+export function TestResult({ profile, go, record, comparison, missed, pace = null }: ScreenProps & Props) {
   const [minutes, setMinutes] = useState(record.minutes);
   useKeydown((e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || onControl(e)) return;
@@ -35,6 +37,9 @@ export function TestResult({ profile, go, record, comparison, missed }: ScreenPr
         <div><b data-testid="accuracy">{Math.round(record.accuracy)}%</b> <span>{COPY.test.accuracy}</span></div>
       </div>
       {prev && <p className="muted" style={{ margin: 0 }}>{COPY.test.lastTime(Math.round(prev.wpm))}</p>}
+      {pace !== null && Math.round(record.wpm) > Math.round(pace) && (
+        <p className="ahead" style={{ margin: 0 }} data-testid="pace-ahead">{COPY.game.paceAhead}</p>
+      )}
       <div>
         <div className="label">{COPY.test.missedMost}</div>
         <div className="chips" style={{ marginTop: 6 }} data-testid="missed">

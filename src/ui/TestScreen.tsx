@@ -1,13 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TestRun, compareTest, saveTest } from '../engine';
+import { paceChars, usualPace } from '../game';
 import type { ScreenProps } from './App';
 import { COPY, fmtClock } from './copy';
 import { hasCommandModifier, isImeKey, onControl, useKeydown, useLeave } from './keys';
 
 const AHEAD = 400;
 
-export function TestScreen({ profile, go, changed, minutes }: ScreenProps & { minutes: number }) {
+export function TestScreen({ profile, go, changed, game, minutes }: ScreenProps & { minutes: number }) {
   const [run] = useState(() => new TestRun(minutes));
+  // The usual-pace line: the average of the last 3 tests of this length, taken before this one.
+  const [pace] = useState(() => (game.settings.paceLine ? usualPace(profile.tests, minutes) : null));
   const [now, setNow] = useState(() => performance.now());
   const [ime, setIme] = useState(false);
   const [caps, setCaps] = useState(false);
@@ -23,7 +26,7 @@ export function TestScreen({ profile, go, changed, minutes }: ScreenProps & { mi
     const missed = run.topMissed();
     const record = saveTest(profile, run);
     changed({ now: true });
-    go({ name: 'testResult', record, comparison: compareTest(profile.tests, record), missed });
+    go({ name: 'testResult', record, comparison: compareTest(profile.tests, record), missed, pace });
   };
 
   useEffect(() => {
@@ -78,6 +81,7 @@ export function TestScreen({ profile, go, changed, minutes }: ScreenProps & { mi
 
   const text = run.text.slice(0, run.pos + AHEAD);
   const err = errAt && errAt.pos === run.pos ? errAt : null;
+  const ghost = pace !== null && run.startAt !== null ? paceChars(pace, Math.min(now - run.startAt, run.durationMs)) : -1;
 
   return (
     <section className="panel practice" data-testid="test" data-expected={run.expected} data-started={run.startAt !== null}>
@@ -94,7 +98,12 @@ export function TestScreen({ profile, go, changed, minutes }: ScreenProps & { mi
           {[...text].map((ch, i) => (
             <span
               key={err && i === run.pos ? `${i}-${err.tick}` : i}
-              className={i < run.pos ? 'done' : i === run.pos ? (err ? 'at err' : 'at') : undefined}
+              className={
+                [i < run.pos ? 'done' : i === run.pos ? (err ? 'at err' : 'at') : '', i === ghost && i !== run.pos ? 'ghost' : '']
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
+              data-ghost={i === ghost ? 'true' : undefined}
             >
               {ch}
             </span>
@@ -102,6 +111,12 @@ export function TestScreen({ profile, go, changed, minutes }: ScreenProps & { mi
         </div>
       </div>
       <p className="note">{COPY.test.rules}</p>
+      {pace !== null && (
+        <p className="note pacekey" data-testid="pace-key">
+          <i />
+          {COPY.game.paceKey} · {COPY.game.paceNote(Math.round(pace))}
+        </p>
+      )}
     </section>
   );
 }

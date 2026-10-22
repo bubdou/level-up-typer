@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Profile, RoundSummary, TestComparison, TestRecord } from '../engine';
-import type { GameState, RoundPoints } from '../game';
+import type { ChallengeResult, GameState, RoundPoints } from '../game';
 import { applyHeadStart, lookUnlocked, levelOf, newGameState, syncEverMastered } from '../game';
 import { flush, loadGame, loadProfile, requestPersistence, saveGame, saveProfile, saveSoon } from '../storage/store';
+import { ChallengeResultPage } from './ChallengeResult';
 import { CollectionPage } from './CollectionPage';
 import { COPY } from './copy';
 import { Home } from './Home';
@@ -20,11 +21,20 @@ export type Screen =
   | { name: 'summary'; summary: RoundSummary; points: RoundPoints | null }
   | { name: 'test'; minutes: number }
   | { name: 'testStopped'; minutes: number }
-  | { name: 'testResult'; record: TestRecord; comparison: TestComparison; missed: string[] }
+  | { name: 'testResult'; record: TestRecord; comparison: TestComparison; missed: string[]; pace: number | null }
   | { name: 'progress'; minutes?: number }
   | { name: 'settings' }
   | { name: 'collection' }
-  | { name: 'powerUps' };
+  | { name: 'powerUps' }
+  | { name: 'challenge'; challenge: ChallengeSpec }
+  | { name: 'challengeResult'; challenge: ChallengeSpec; summary: RoundSummary; result: ChallengeResult };
+
+/** One Collection set to challenge. */
+export interface ChallengeSpec {
+  set: string;
+  items: string[];
+  label: string;
+}
 
 export interface ScreenProps {
   profile: Profile;
@@ -108,7 +118,7 @@ export function App() {
 
   const props: ScreenProps = { profile, go, changed, update, game, updateGame };
   const look = lookUnlocked(levelOf(game.xp), game.settings.look) ? game.settings.look : 'classic';
-  const inRound = screen.name === 'practice' || screen.name === 'test';
+  const inRound = screen.name === 'practice' || screen.name === 'test' || screen.name === 'challenge';
 
   return (
     <div className="wrap">
@@ -130,11 +140,15 @@ export function App() {
         {screen.name === 'summary' && <Summary {...props} summary={screen.summary} points={screen.points} />}
         {screen.name === 'test' && <TestScreen {...props} minutes={screen.minutes} />}
         {screen.name === 'testStopped' && <TestStopped {...props} minutes={screen.minutes} />}
-        {screen.name === 'testResult' && <TestResult {...props} record={screen.record} comparison={screen.comparison} missed={screen.missed} />}
+        {screen.name === 'testResult' && <TestResult {...props} record={screen.record} comparison={screen.comparison} missed={screen.missed} pace={screen.pace} />}
         {screen.name === 'progress' && <ProgressPage {...props} initialMinutes={screen.minutes} />}
         {screen.name === 'settings' && <SettingsPage {...props} />}
         {screen.name === 'collection' && <CollectionPage {...props} />}
         {screen.name === 'powerUps' && <PowerUpsPage {...props} />}
+        {screen.name === 'challenge' && <Practice {...props} look={look} challenge={screen.challenge} />}
+        {screen.name === 'challengeResult' && (
+          <ChallengeResultPage {...props} challenge={screen.challenge} summary={screen.summary} result={screen.result} />
+        )}
       </main>
     </div>
   );

@@ -8,7 +8,11 @@ import {
   collection,
   collectionTotal,
   daysThisWeek,
+  finishChallenge,
   finishRound,
+  medalFor,
+  paceChars,
+  usualPace,
   levelOf,
   levelStart,
   masteredCount,
@@ -531,5 +535,60 @@ describe('config', () => {
   it('holds every number', () => {
     expect(GAME_CONFIG.xp).toMatchObject({ smooth: 10, slowClean: 5, fixed: 15, mastered: 20, weekGoal: 200, headStartPerRound: 300 });
     expect(GAME_CONFIG.weekGoalDaysDefault).toBe(4);
+  });
+});
+
+describe('set challenge medals (M2b)', () => {
+  const sum = (cleanRate: number, chunks = 20) => summaryOf({ kind: 'challenge', cleanRate, chunks, minutes: 0.75 });
+
+  it('gold 95%, silver 85%, bronze for finishing, nothing when stopped early', () => {
+    expect(medalFor(sum(95), true)).toBe('gold');
+    expect(medalFor(sum(94), true)).toBe('silver');
+    expect(medalFor(sum(85), true)).toBe('silver');
+    expect(medalFor(sum(84), true)).toBe('bronze');
+    expect(medalFor(sum(100, 9), true)).toBe('bronze');
+    expect(medalFor(sum(100), false)).toBeNull();
+  });
+
+  it('keeps the best medal, adds XP, and is not a week-goal day', () => {
+    const g = newGameState();
+    const s1 = new RoundScorer(0);
+    s1.onEvent(ev('smooth'));
+    const r1 = finishChallenge(g, 'chunks-0', sum(90), s1, true);
+    expect(r1).toMatchObject({ medal: 'silver', best: 'silver', improved: true });
+    expect(g.xp).toBe(10);
+    const r2 = finishChallenge(g, 'chunks-0', sum(50), new RoundScorer(g.xp), true);
+    expect(r2).toMatchObject({ medal: 'bronze', best: 'silver', improved: false });
+    const r3 = finishChallenge(g, 'chunks-0', sum(99), new RoundScorer(g.xp), true);
+    expect(r3).toMatchObject({ medal: 'gold', best: 'gold', improved: true });
+    expect(g.medals).toEqual({ 'chunks-0': 'gold' });
+    expect(g.weekGoalsPaid).toEqual([]);
+    expect(Object.keys(g.rounds)).toEqual([]);
+  });
+});
+
+describe('usual-pace line (M2b)', () => {
+  const t = (minutes: number, wpm: number, day: number) => ({
+    id: `t${day}${minutes}`,
+    date: new Date(2026, 9, day, 10).toISOString(),
+    minutes,
+    wpm,
+    accuracy: 95,
+    correctChars: 0,
+    keystrokes: 0,
+    wrongKeys: 0,
+    errorsByKey: {},
+  });
+
+  it('is the average of the last 3 tests of the same length, and hidden with fewer', () => {
+    expect(usualPace([t(1, 10, 1), t(1, 12, 2)], 1)).toBeNull();
+    const tests = [t(1, 10, 1), t(1, 12, 2), t(3, 40, 3), t(1, 14, 4), t(1, 16, 5)];
+    expect(usualPace(tests, 1)).toBe(14);
+    expect(usualPace(tests, 3)).toBeNull();
+  });
+
+  it('moves 5 characters per word per minute', () => {
+    expect(paceChars(12, 60_000)).toBe(60);
+    expect(paceChars(12, 30_000)).toBe(30);
   });
 });

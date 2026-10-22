@@ -30,6 +30,8 @@ export interface LetterRecord {
 
 export interface RoundSummary {
   id: string;
+  /** Set challenges are not rounds: they are not stored in `rounds` and never count as a day. */
+  kind?: 'round' | 'challenge';
   date: string;
   minutes: number;
   segments: string[];
