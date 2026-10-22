@@ -16,12 +16,23 @@ export interface Feedback {
   bubbles: Bubble[];
 }
 
-const zeroCounts = (): RoundPoints['counts'] => ({ smooth: 0, slowClean: 0, quick: 0, fixed: 0, mastered: 0, flowChain: 0 });
-const zeroXp = (): RoundPoints['xp'] => ({
+const zeroCounts = (): RoundPoints['counts'] => ({
   smooth: 0,
+  letters: 0,
   slowClean: 0,
   quick: 0,
   fixed: 0,
+  fixedLetters: 0,
+  mastered: 0,
+  flowChain: 0,
+});
+const zeroXp = (): RoundPoints['xp'] => ({
+  smooth: 0,
+  letters: 0,
+  slowClean: 0,
+  quick: 0,
+  fixed: 0,
+  fixedLetters: 0,
   mastered: 0,
   flowChain: 0,
   comboBonus: 0,
@@ -39,6 +50,8 @@ export class RoundScorer {
   readonly counts = zeroCounts();
   readonly xp = zeroXp();
   readonly newlyMastered: string[] = [];
+  /** What the last Fixed! was worth, for its toast. */
+  lastFixedXp: number = GAME_CONFIG.xp.fixed;
   private _combo = 0;
   private _shieldUsed = false;
   private chain = 0;
@@ -86,7 +99,10 @@ export class RoundScorer {
       case 'smooth':
       case 'slow': {
         const mult = this.hot ? GAME_CONFIG.combo.multiplier : 1;
-        if (e.type === 'smooth') {
+        if (e.type === 'smooth' && e.text.length === 1) {
+          this.counts.letters++;
+          this.award('letters', GAME_CONFIG.xp.singleLetterSmooth, mult);
+        } else if (e.type === 'smooth') {
           this.counts.smooth++;
           this.award('smooth', GAME_CONFIG.xp.smooth, mult);
           // Spark trains starting a chunk without stopping first, so the Keys warm-up does not count.
@@ -118,9 +134,16 @@ export class RoundScorer {
         break;
       }
       case 'fixed':
-        this.counts.fixed++;
         this.pending.fixed = true;
-        this.award('fixed', GAME_CONFIG.xp.fixed, 1);
+        if (e.text.length === 1) {
+          this.counts.fixedLetters++;
+          this.lastFixedXp = GAME_CONFIG.xp.singleLetterFixed;
+          this.award('fixedLetters', this.lastFixedXp, 1);
+        } else {
+          this.counts.fixed++;
+          this.lastFixedXp = GAME_CONFIG.xp.fixed;
+          this.award('fixed', this.lastFixedXp, 1);
+        }
         break;
       case 'mastered':
         // Paid once per item: mastering it again after the engine cleared it earns nothing extra.
@@ -150,7 +173,7 @@ export class RoundScorer {
     }
   }
 
-  private award(kind: 'smooth' | 'slowClean' | 'quick' | 'fixed' | 'mastered' | 'flowChain', base: number, mult: number) {
+  private award(kind: Exclude<keyof RoundPoints['xp'], 'comboBonus' | 'keyFinder' | 'weekGoal'>, base: number, mult: number) {
     if (base <= 0) return;
     const before = this.level;
     this.xp[kind] += base;

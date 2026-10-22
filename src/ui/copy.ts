@@ -176,9 +176,11 @@ export const COPY = {
     pointsTitle: 'Points this round',
     rows: {
       smooth: 'Smooth chunks',
+      letters: 'Single letters',
       slowClean: 'Clean but slow',
       quick: 'Quick starts (Spark)',
       fixed: 'Fixed',
+      fixedLetters: 'Fixed letters',
       mastered: 'Newly mastered',
       flowChain: 'Flow Chain',
       comboBonus: 'Combo bonus',

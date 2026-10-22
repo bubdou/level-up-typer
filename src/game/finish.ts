@@ -75,9 +75,9 @@ export function syncEverMastered(g: GameState, profile: Profile): number {
 }
 
 /**
- * The first time the game meets a profile: +300 XP for each round already played. Mastered items
- * need nothing here, because dots are always read from the engine. Returns the XP given (0 when
- * it was given before).
+ * The first time the game meets a profile: +300 XP for each round already played. Items it
+ * already mastered fill their dots through syncEverMastered, without XP. Returns the XP given
+ * (0 when it was given before).
  */
 export function applyHeadStart(g: GameState, profile: Profile, now: number): number {
   if (g.headStart) return 0;

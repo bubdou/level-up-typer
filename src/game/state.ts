@@ -5,13 +5,25 @@ import { GAME_CONFIG } from './config';
 export interface RoundPoints {
   roundId: string;
   date: string;
-  counts: { smooth: number; slowClean: number; quick: number; fixed: number; mastered: number; flowChain: number };
-  /** XP by source. Smooth and quick are before doubling; comboBonus is what doubling added. */
-  xp: {
+  counts: {
     smooth: number;
+    /** Smooth single letters, counted apart because they earn less. */
+    letters: number;
     slowClean: number;
     quick: number;
     fixed: number;
+    fixedLetters: number;
+    mastered: number;
+    flowChain: number;
+  };
+  /** XP by source. Smooth and quick are before doubling; comboBonus is what doubling added. */
+  xp: {
+    smooth: number;
+    letters: number;
+    slowClean: number;
+    quick: number;
+    fixed: number;
+    fixedLetters: number;
     mastered: number;
     flowChain: number;
     comboBonus: number;

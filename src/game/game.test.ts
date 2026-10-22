@@ -87,6 +87,41 @@ describe('XP for each event', () => {
   });
 });
 
+describe('single letters earn about half', () => {
+  const letter = (type: OutcomeType) => ev(type, { segment: 'keys', text: 'q' });
+  const fixedLetter: ChunkEvent = { type: 'fixed', text: 'q', itemKey: null, segment: 'keys' };
+
+  it('smooth letter 5, fixed letter 10, a 2-letter chunk still 10', () => {
+    const s = new RoundScorer(0);
+    s.onEvent(letter('smooth'));
+    expect(s.take().xp).toBe(5);
+    s.onEvent(fixedLetter);
+    expect(s.take().xp).toBe(10);
+    expect(s.lastFixedXp).toBe(10);
+    s.onEvent(ev('smooth', { text: 'th' }));
+    expect(s.take().xp).toBe(10);
+    expect(s.counts).toMatchObject({ letters: 1, fixedLetters: 1, smooth: 1, fixed: 0 });
+    expect(s.xp).toMatchObject({ letters: 5, fixedLetters: 10, smooth: 10 });
+  });
+
+  it('letters count toward Combo and their 5 is doubled', () => {
+    const s = new RoundScorer(L(2));
+    for (let i = 0; i < 10; i++) s.onEvent(letter('smooth'));
+    s.take();
+    s.onEvent(letter('smooth'));
+    expect(s.take().xp).toBe(10);
+  });
+
+  it('the round total adds up across letters and chunks', () => {
+    const g = newGameState();
+    const s = new RoundScorer(0);
+    feed(s, [letter('smooth'), letter('smooth'), fixedLetter, ev('smooth'), fixed]);
+    const p = finishRound(g, newProfile(), summaryOf({ minutes: 1 }), s, Date.parse('2026-10-21T10:00:00Z'));
+    expect(p.total).toBe(5 + 5 + 10 + 10 + 15);
+    expect(g.xp).toBe(p.total);
+  });
+});
+
 describe('levels', () => {
   it('500 XP to level 2, 1,250 to 3, 13,500 to 10', () => {
     expect(levelStart(2)).toBe(500);

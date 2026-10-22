@@ -177,7 +177,7 @@ export function Practice({ profile, go, changed, update, game, updateGame, look 
 
   const prompt =
     v.chunkInSegment === 0 && !v.repair ? (v.mode === 'keys' ? COPY.practice.keysTip : COPY.practice.readIt) : '';
-  const toast = v.toast ? (v.toast.kind === 'fixed' ? COPY.game.fixedPoints(GAME_CONFIG.xp.fixed) : COPY.practice.giveUp) : null;
+  const toast = v.toast ? (v.toast.kind === 'fixed' ? COPY.game.fixedPoints(scorer.lastFixedXp) : COPY.practice.giveUp) : null;
   const level = scorer.level;
   const showPop = pop && now < pop.until ? pop : null;
   const bubble = bubbles.find((b) => b.from <= now && now < b.until) ?? null;

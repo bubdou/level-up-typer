@@ -6,12 +6,18 @@ export const GAME_CONFIG = {
   xp: {
     /** A smooth chunk: clean and not slow. */
     smooth: 10,
+    /**
+     * A single letter (in practice only the Keys warm-up) is about a fifth of the keys of a chunk,
+     * so it earns about half: otherwise the warm-up would earn more per minute than Chunks.
+     */
+    singleLetterSmooth: 5,
     /** Clean but slow. It still goes to the repair bay, but being accurate earns something. */
     slowClean: 5,
     /** A wrong key. Never negative. */
     error: 0,
     /** Leaving the repair bay with 3 clean in a row. Repair tries themselves earn nothing. */
     fixed: 15,
+    singleLetterFixed: 10,
     /** An item mastered: one more dot filled in the Collection. */
     mastered: 20,
     /** Once a week, when the week goal is met. */
