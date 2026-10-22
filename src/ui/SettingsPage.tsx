@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import type { HintMode } from '../engine';
 import { CONFIG, newProfile } from '../engine';
+import type { LookId } from '../game';
+import { GAME_CONFIG, levelOf, lookUnlocked, newGameState } from '../game';
 import type { ScreenProps } from './App';
 import { COPY } from './copy';
 import { onControl, useKeydown } from './keys';
 
-export function SettingsPage({ profile, go, changed, update }: ScreenProps) {
+export function SettingsPage({ profile, go, changed, update, game, updateGame }: ScreenProps) {
   const [armed, setArmed] = useState(false);
   const [cleared, setCleared] = useState(false);
   useKeydown((e) => {
@@ -13,6 +15,8 @@ export function SettingsPage({ profile, go, changed, update }: ScreenProps) {
     if (e.key === 'Escape') go({ name: 'home' });
   });
   const s = profile.settings;
+  const gs = game.settings;
+  const level = levelOf(game.xp);
 
   const reset = () => {
     if (!armed) {
@@ -20,6 +24,8 @@ export function SettingsPage({ profile, go, changed, update }: ScreenProps) {
       return;
     }
     update((p) => Object.assign(p, { ...newProfile(), settings: p.settings }));
+    // The game starts over too, without a head start: there are no rounds left to count.
+    updateGame((g) => Object.assign(g, { ...newGameState(), headStart: { rounds: 0, xp: 0, at: new Date().toISOString() }, settings: g.settings }));
     setArmed(false);
     setCleared(true);
     changed({ now: true });
@@ -40,6 +46,31 @@ export function SettingsPage({ profile, go, changed, update }: ScreenProps) {
           {(['auto', 'always', 'off'] as const).map((m) => <option key={m} value={m}>{COPY.settings.hintModes[m]}</option>)}
         </select>
       </label>
+      <label htmlFor="look">
+        {COPY.settings.look}
+        <select id="look" value={lookUnlocked(level, gs.look) ? gs.look : 'classic'} onChange={(e) => updateGame((g) => (g.settings.look = e.target.value as LookId))}>
+          {GAME_CONFIG.looks.map((l) => (
+            <option key={l.id} value={l.id} disabled={level < l.level}>
+              {level < l.level ? COPY.settings.lookLocked(COPY.game.looks[l.id], l.level) : COPY.game.looks[l.id]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label htmlFor="sounds">
+        {COPY.settings.sounds}
+        <input id="sounds" type="checkbox" checked={gs.sounds} onChange={(e) => updateGame((g) => (g.settings.sounds = e.target.checked))} />
+      </label>
+      <label htmlFor="anim">
+        {COPY.settings.animations}
+        <input id="anim" type="checkbox" checked={gs.animations} onChange={(e) => updateGame((g) => (g.settings.animations = e.target.checked))} />
+      </label>
+      <label htmlFor="week">
+        {COPY.settings.weekGoal}
+        <select id="week" value={gs.weekGoalDays} onChange={(e) => updateGame((g) => (g.settings.weekGoalDays = Number(e.target.value)))}>
+          {GAME_CONFIG.weekGoalDaysOptions.map((n) => <option key={n} value={n}>{COPY.settings.weekGoalDays(n)}</option>)}
+        </select>
+      </label>
+      <p className="note" style={{ margin: 0 }}>{COPY.settings.motionNote}</p>
       <div className="row">
         <button className="btn ghost" onClick={reset}>{armed ? COPY.settings.resetConfirm : COPY.settings.reset}</button>
         {cleared && <span className="note">{COPY.settings.resetDone}</span>}

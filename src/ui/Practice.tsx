@@ -1,18 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RoundView } from '../engine';
 import { CONFIG, Round, keysLetters, knownShare, letterState } from '../engine';
+import type { Bubble, LookId } from '../game';
+import { GAME_CONFIG, RoundScorer, finishRound, hasPowerUp } from '../game';
 import type { ScreenProps } from './App';
 import { roundMinutesOverride } from './params';
-import { COPY, fmtClock } from './copy';
+import { COPY, fmtClock, unlockName } from './copy';
+import { GameIcon } from './GameParts';
 import { Keyboard } from './Keyboard';
+import { playSound } from './sounds';
 import { hasCommandModifier, isImeKey, useKeydown, useLeave } from './keys';
 
 const MARK = { smooth: '✓', slow: '◷', error: '✕' } as const;
 const MARK_CLASS = { smooth: 'good', slow: 'slow', error: 'bad' } as const;
 
-export function Practice({ profile, go, changed, update }: ScreenProps) {
+const bubbleText = (b: Bubble) =>
+  b.kind === 'combo'
+    ? COPY.game.comboOn
+    : b.kind === 'shield'
+      ? COPY.game.shieldKept
+      : COPY.game.levelUp(b.level, b.unlocks.length ? b.unlocks.map(unlockName).join(', ') : null);
+
+export function Practice({ profile, go, changed, update, game, updateGame, look }: ScreenProps & { look: LookId }) {
   const s = profile.settings;
-  const [round] = useState(() => new Round(profile, { minutes: roundMinutesOverride() ?? s.roundMinutes, choose: s.choose, now: performance.now() }));
+  // The scorer only listens to the engine's events; it never changes the round.
+  const [scorer] = useState(() => new RoundScorer(game.xp));
+  const [round] = useState(
+    () =>
+      new Round(profile, {
+        minutes: roundMinutesOverride() ?? s.roundMinutes,
+        choose: s.choose,
+        now: performance.now(),
+        onEvent: (e) => scorer.onEvent(e),
+      }),
+  );
+  const [pop, setPop] = useState<{ text: string; until: number; id: number } | null>(null);
+  const [bubbles, setBubbles] = useState<{ text: string; level: boolean; from: number; until: number }[]>([]);
   const [keysToFind] = useState(() => keysLetters(profile));
   const [now, setNow] = useState(() => performance.now());
   const [ime, setIme] = useState(false);
@@ -27,7 +50,9 @@ export function Practice({ profile, go, changed, update }: ScreenProps) {
     endedRef.current = true;
     const summary = round.finish();
     changed({ now: true });
-    go(summary ? { name: 'summary', summary } : { name: 'home' });
+    const points = summary ? finishRound(game, profile, summary, scorer, Date.now()) : null;
+    if (points) updateGame(() => {});
+    go(summary ? { name: 'summary', summary, points } : { name: 'home' });
   };
 
   useEffect(() => {
@@ -46,6 +71,27 @@ export function Practice({ profile, go, changed, update }: ScreenProps) {
       rerender();
     }
   });
+
+  function showFeedback(t: number) {
+    const f = scorer.take();
+    const sounds = game.settings.sounds;
+    if (f.xp > 0 && !f.fixed) {
+      setPop({ text: f.mastered ? COPY.game.popMastered(f.xp) : COPY.game.pop(f.xp), until: t + GAME_CONFIG.popMs, id: t });
+    }
+    if (sounds && f.fixed) playSound('fixed');
+    if (sounds && f.mastered) playSound('mastered');
+    if (sounds && f.bubbles.some((b) => b.kind === 'level')) playSound('level');
+    if (f.bubbles.length) {
+      // One bubble at a time, each shown for a fixed time after the one before it.
+      const queue = bubbles.filter((b) => b.until > t);
+      let from = Math.max(t, queue.at(-1)?.until ?? 0);
+      for (const b of f.bubbles) {
+        queue.push({ text: bubbleText(b), level: b.kind === 'level', from, until: from + GAME_CONFIG.bubbleMs });
+        from += GAME_CONFIG.bubbleMs;
+      }
+      setBubbles(queue);
+    }
+  }
 
   useKeydown((e) => {
     if (isImeKey(e)) {
@@ -77,7 +123,10 @@ export function Practice({ profile, go, changed, update }: ScreenProps) {
     const before = round.view(now);
     const res = round.key(e.key, now);
     if (res === 'wrong') setErrAt({ tick: before.errorTick + 1, pos: before.pos, seq: before.seq });
-    if (res === 'done') changed();
+    if (res === 'done') {
+      changed();
+      showFeedback(now);
+    }
     if (round.isFinished) end();
     else rerender();
   });
@@ -128,11 +177,14 @@ export function Practice({ profile, go, changed, update }: ScreenProps) {
 
   const prompt =
     v.chunkInSegment === 0 && !v.repair ? (v.mode === 'keys' ? COPY.practice.keysTip : COPY.practice.readIt) : '';
-  const toast = v.toast ? (v.toast.kind === 'fixed' ? COPY.practice.fixed : COPY.practice.giveUp) : null;
+  const toast = v.toast ? (v.toast.kind === 'fixed' ? COPY.game.fixedPoints(GAME_CONFIG.xp.fixed) : COPY.practice.giveUp) : null;
+  const level = scorer.level;
+  const showPop = pop && now < pop.until ? pop : null;
+  const bubble = bubbles.find((b) => b.from <= now && now < b.until) ?? null;
   const firstChunk = v.segIndex === 0 && v.chunkInSegment === 0 && v.pos === 0;
 
   return (
-    <section className="panel practice" data-testid="practice" data-expected={v.expected} data-mode={v.mode} data-paused={v.paused} data-interstitial={v.interstitial ?? ''}>
+    <section className={`panel practice look-${look}`} data-testid="practice" data-expected={v.expected} data-mode={v.mode} data-paused={v.paused} data-interstitial={v.interstitial ?? ''}>
       <div className="topbar">
         <span className="mode">
           {v.segments.map((_, i) => (
@@ -144,6 +196,33 @@ export function Practice({ profile, go, changed, update }: ScreenProps) {
         </span>
         <div className="bar"><i style={{ width: `${Math.min(100, (v.activeMs / v.limitMs) * 100)}%` }} /></div>
         <span>{fmtClock(Math.max(0, v.limitMs - v.activeMs))}</span>
+      </div>
+
+      <div className="gamebar" data-testid="gamebar">
+        <span className="gxp" data-testid="round-xp">{COPY.game.roundXp(scorer.gained)}</span>
+        {hasPowerUp(level, 'combo') ? (
+          <span className={`combo${scorer.hot ? ' hot' : ''}`} data-testid="combo">
+            {COPY.game.combo}
+            <span className="pips" aria-label={`${Math.min(scorer.combo, GAME_CONFIG.combo.need)} of ${GAME_CONFIG.combo.need}`}>
+              {Array.from({ length: GAME_CONFIG.combo.need }, (_, i) => <i key={i} className={i < scorer.combo ? 'on' : ''} />)}
+            </span>
+            {scorer.hot && <span className="x2">×2</span>}
+          </span>
+        ) : (
+          <span>{COPY.game.comboLocked}</span>
+        )}
+        {hasPowerUp(level, 'shield') && (
+          <span className={`shield${scorer.shieldUsed ? ' used' : ''}`}>
+            <GameIcon id="shield" />
+            {COPY.game.shield}
+          </span>
+        )}
+        {hasPowerUp(level, 'spark') && <span>{COPY.game.sparkOn}</span>}
+        {bubble && (
+          <span key={`${bubble.text}-${bubble.from}`} className={`gbubble${bubble.level ? ' lv' : ''}`} role="status" data-testid="bubble">
+            {bubble.text}
+          </span>
+        )}
       </div>
 
       {ime && <div className="banner big" role="alert">{COPY.warn.ime}</div>}
@@ -182,6 +261,7 @@ export function Practice({ profile, go, changed, update }: ScreenProps) {
                 <div className="prompt">{firstChunk ? `${prompt} ${COPY.practice.fingers}` : prompt}</div>
                 <div className="strip">
                   <div className="prev" data-testid="prev">
+                    {showPop && <span key={showPop.id} className="pop" data-testid="pop">{showPop.text}</span>}
                     {v.prev && (
                       <>
                         <span>{v.prev.text}</span>

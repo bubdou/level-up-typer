@@ -25,8 +25,20 @@ export type Outcome = 'smooth' | 'slow' | 'error';
 
 /** The five events the game layer (M2) can subscribe to. */
 export type ChunkEvent =
-  | { type: 'smooth' | 'slow' | 'error'; text: string; itemKey: string | null }
-  | { type: 'fixed'; text: string; itemKey: string | null }
+  | {
+      type: 'smooth' | 'slow' | 'error';
+      text: string;
+      itemKey: string | null;
+      /** The segment's judging mode: keys, chunks or flow. */
+      segment: JudgeMode;
+      /** Start delay in ms, null when the learner was away. */
+      start: number | null;
+      /** The personal median start delay that "slow" uses; null until the baseline is built. */
+      medianStart: number | null;
+      /** Start below the personal median. Null when either number is missing. */
+      quickStart: boolean | null;
+    }
+  | { type: 'fixed'; text: string; itemKey: string | null; segment: JudgeMode }
   | { type: 'mastered'; text: string; itemKey: string };
 
 interface Entry {
@@ -135,6 +147,7 @@ export class Round {
   private sentenceClean = true;
   private openingPicks = 0;
   private hunt: Set<string>;
+  private huntAtStart: string[];
   private keysLetters: string[];
 
   readonly results: ChunkResult[] = [];
@@ -152,7 +165,8 @@ export class Round {
     this.id = `r${this.wall().toString(36)}${Math.floor(this.rng() * 1e6).toString(36)}`;
     this.segments = opts.segments ?? planRound(profile, opts.minutes, opts.choose ?? null);
     this.limitMs = this.segments.reduce((a, s) => a + s.ms, 0);
-    this.hunt = new Set(huntLetters(profile));
+    this.huntAtStart = huntLetters(profile);
+    this.hunt = new Set(this.huntAtStart);
     this.keysLetters = keysLetters(profile);
     this.lastTick = opts.now;
     this.lastKeyAt = opts.now;
@@ -263,6 +277,7 @@ export class Round {
       cleanRate: Math.round((100 * clean) / this.results.length),
       fixed: [...new Set(this.fixed)],
       huntLetters: huntLetters(this.p),
+      huntLettersAtStart: this.huntAtStart,
       slowChunks: [...new Set(this.results.filter((r) => r.outcome === 'slow').map((r) => r.text))],
       flowMedStart: round(median(this.flowStarts)),
       repairs: this.repairs,
@@ -431,6 +446,7 @@ export class Round {
 
     const start = m.away ? null : m.startDelay;
     const perKey = m.away ? null : m.perKey;
+    const medianStart = slowBaseline(this.p).start;
     const slow = entry.mode === 'chunks' && clean && this.isSlow(start, perKey);
     const outcome: Outcome = !clean ? 'error' : slow ? 'slow' : 'smooth';
     this.results.push({ text: entry.text, outcome, mode: entry.mode, start, perKey });
@@ -454,7 +470,8 @@ export class Round {
       }
     }
 
-    this.emit({ type: outcome, text: entry.text, itemKey: entry.itemKey });
+    const quickStart = start === null || medianStart === null ? null : start < medianStart;
+    this.emit({ type: outcome, text: entry.text, itemKey: entry.itemKey, segment: entry.mode, start, medianStart, quickStart });
 
     if (outcome !== 'smooth') {
       this.repair = { clean: 0, tries: 0 };
@@ -512,7 +529,7 @@ export class Round {
     if (r.clean >= CONFIG.repairCleanNeeded) {
       this.fixed.push(entry.text);
       this.fixedAt.set(key, this.mainCount);
-      this.emit({ type: 'fixed', text: entry.text, itemKey: entry.itemKey });
+      this.emit({ type: 'fixed', text: entry.text, itemKey: entry.itemKey, segment: entry.mode });
       this.repair = null;
       this.toast = { kind: 'fixed', until: now + CONFIG.fixedToastMs };
       this.scheduleRevisits(entry, CONFIG.revisitAfterFix);

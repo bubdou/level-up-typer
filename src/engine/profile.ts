@@ -39,7 +39,10 @@ export interface RoundSummary {
   /** Percent of chunks typed without a wrong key (repair tries not counted). */
   cleanRate: number;
   fixed: string[];
+  /** Hunting letters at the end of the round. */
   huntLetters: string[];
+  /** Hunting letters when the round started. Missing on rounds from before M2. */
+  huntLettersAtStart?: string[];
   slowChunks: string[];
   flowMedStart: number | null;
   repairs: number;

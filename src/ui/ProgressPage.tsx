@@ -5,7 +5,7 @@ import { ProgressChart } from './Chart';
 import { COPY, fmtDay } from './copy';
 import { onControl, useKeydown } from './keys';
 
-export function ProgressPage({ profile, go, initialMinutes }: ScreenProps & { initialMinutes?: number }) {
+export function ProgressPage({ profile, go, game, initialMinutes }: ScreenProps & { initialMinutes?: number }) {
   const [minutes, setMinutes] = useState(initialMinutes ?? (profile.tests.at(-1)?.minutes ?? 1));
   useKeydown((e) => {
     if (onControl(e)) return;
@@ -39,6 +39,7 @@ export function ProgressPage({ profile, go, initialMinutes }: ScreenProps & { in
                     <td>{r.medStart != null ? `${(r.medStart / 1000).toFixed(2)} s` : '–'}</td>
                     <td>{r.medPerKey != null ? `${r.medPerKey} ms` : '–'}</td>
                     <td>{r.cleanRate}%</td>
+                    <td data-testid="round-xp-cell">{game.rounds[r.id] ? `+${game.rounds[r.id].total}` : '–'}</td>
                     <td>{r.huntLetters.length ? r.huntLetters.join(' ') : COPY.progress.none}</td>
                   </tr>
                 ))}

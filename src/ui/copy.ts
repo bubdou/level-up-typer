@@ -1,9 +1,11 @@
 // All English UI text in one place, from the M0 spec's copy table.
 // Change words here, not in components.
 
+import type { Unlock } from '../game';
+
 export const COPY = {
   appName: 'Level Up Typer',
-  nav: { progress: 'Progress', settings: 'Settings', home: 'Home' },
+  nav: { progress: 'Progress', settings: 'Settings', home: 'Home', collection: 'Collection', powerUps: 'Power-ups' },
 
   home: {
     title: 'Ready to practice?',
@@ -108,7 +110,7 @@ export const COPY = {
     tests: 'Tests',
     rounds: 'Practice rounds',
     noRounds: 'Your rounds show here after you play.',
-    cols: ['Date', 'Round', 'Minutes', 'Start time', 'Per key', 'Clean', 'Keys to find'],
+    cols: ['Date', 'Round', 'Minutes', 'Start time', 'Per key', 'Clean', 'XP', 'Keys to find'],
     keysToFind: 'Keys to find',
     keysToFindNote: 'Letters with long pauses before them.',
     slowChunks: 'Slow chunks',
@@ -125,6 +127,13 @@ export const COPY = {
     resetConfirm: 'Press again to reset',
     resetDone: 'Progress cleared.',
     storageNote: 'Progress is saved in this browser.',
+    look: 'Look',
+    lookLocked: (name: string, level: number) => `${name} (level ${level})`,
+    sounds: 'Sounds',
+    animations: 'Animations',
+    weekGoal: 'Week goal',
+    weekGoalDays: (n: number) => `${n} days a week`,
+    motionNote: 'Animations are always off when your computer is set to reduce motion.',
     aboutTitle: 'About',
     about: [
       'Letter pairs: ranking by Peter Norvig from Google Books Ngram counts.',
@@ -132,6 +141,89 @@ export const COPY = {
       'Common words and More words: the Dolch sight word lists (1936).',
       'Phrases and sentences: written for Level Up Typer.',
     ],
+  },
+
+  // M2 game layer, from the M2 spec's copy table (plain look).
+  game: {
+    level: (n: number) => `Level ${n}`,
+    xpOf: (into: number, need: number) => `${fmtNum(into)} / ${fmtNum(need)} XP`,
+    nextUnlock: (level: number, name: string) => `Level ${level} unlocks ${name}`,
+    week: 'This week',
+    weekProgress: (n: number, goal: number, xp: number) => `${n} of ${goal} days. ${goal - n} more for +${xp} XP.`,
+    weekDone: (xp: number) => `Week goal done! +${xp} XP`,
+    weekStreak: (n: number) => `Week goal: ${n} weeks in a row`,
+    dayLetters: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+    dayNames: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    collection: 'Collection',
+    masteredOf: (n: number, total: number) => `${n} of ${total} mastered`,
+    ofTotal: (total: number) => `of ${total} mastered`,
+    seeCollection: 'See your collection',
+    testsNoXp: "Tests don't give XP.",
+    headStart: (perRound: number) => `Head start: +${perRound} XP for each round you played.`,
+    // practice
+    roundXp: (n: number) => `+${fmtNum(n)} XP`,
+    combo: 'Combo',
+    comboLocked: 'Combo unlocks at level 2',
+    shield: 'Shield',
+    sparkOn: 'Spark on',
+    pop: (xp: number) => `+${xp}`,
+    popMastered: (xp: number) => `+${xp} · mastered`,
+    fixedPoints: (xp: number) => `Fixed! +${xp}`,
+    levelUp: (n: number, what: string | null) => (what ? `Level ${n}! ${what} unlocked` : `Level ${n}!`),
+    comboOn: 'Combo! Points ×2',
+    shieldKept: 'Shield kept your Combo',
+    // summary
+    pointsTitle: 'Points this round',
+    rows: {
+      smooth: 'Smooth chunks',
+      slowClean: 'Clean but slow',
+      quick: 'Quick starts (Spark)',
+      fixed: 'Fixed',
+      mastered: 'Newly mastered',
+      flowChain: 'Flow Chain',
+      comboBonus: 'Combo bonus',
+      keyFinder: 'Keys found',
+      weekGoal: 'Week goal',
+    } as Record<string, string>,
+    times: (n: number, xp: number) => `${n} × ${xp}`,
+    doubled: 'doubled points',
+    weekDetail: (days: number) => `${days} days this week`,
+    total: 'Total',
+    newPowerUp: (level: number) => `Level ${level} · new power-up`,
+    newLook: (level: number) => `Level ${level} · new look`,
+    newLookText: 'Pick it in Settings. It changes the practice colours.',
+    newlyMastered: 'Newly mastered',
+    noneMastered: 'None this round. Smooth again in another round to master it.',
+    keyFound: (k: string, xp: number) => `Key found: ${k} +${xp}`,
+    // collection
+    collectionLead: 'Every chunk, word or phrase you master fills a dot.',
+    collectionSets: 'Sets of 10 open as you go: master 8 of a set and the next one opens.',
+    tracksNote: 'Chunks, words and flow grow side by side, so three groups fill at once.',
+    zoneCount: (n: number, total: number) => `${n} of ${total}`,
+    legendMastered: 'Mastered',
+    legendOpen: 'Practicing',
+    legendLocked: 'Not open yet',
+    setTitle: (zone: string, n: number) => `${zone}, set ${n}`,
+    setCount: (n: number) => `${n} of 10 mastered`,
+    setLocked: 'This set opens later.',
+    setComplete: 'Set complete. A new set is open.',
+    pickSet: 'Pick a set to see what is in it.',
+    // power-ups
+    powerUpsTitle: 'Power-ups',
+    powerUpsLead: 'Power-ups give points or looks. None of them skip a fix.',
+    atLevel: (n: number) => `Level ${n}`,
+    unlocked: 'Unlocked',
+    looksTitle: 'Looks',
+    looksNote: 'Looks change the practice colours. The finger colours on the keyboard stay the same.',
+    powerUps: {
+      combo: { name: 'Combo', what: '10 clean chunks in a row: your points double until a wrong key.', trains: 'Trains: accuracy first' },
+      spark: { name: 'Spark', what: '+5 when you start a chunk faster than you usually do.', trains: 'Trains: start time (whole words)' },
+      keyFinder: { name: 'Key Finder', what: '+50 when a key you looked for becomes easy.', trains: 'Trains: keys without looking' },
+      flowChain: { name: 'Flow Chain', what: 'In Flow, 5 words in a row with no long stop: +10.', trains: 'Trains: word to word' },
+      shield: { name: 'Shield', what: 'Once a round, a wrong key keeps your Combo. You still fix the chunk.', trains: 'Keeps a Combo safe' },
+    } as Record<string, { name: string; what: string; trains: string }>,
+    looks: { classic: 'Classic', ocean: 'Ocean', forest: 'Forest', night: 'Night' } as Record<string, string>,
+    lookName: (name: string) => `${name} look`,
   },
 
   warn: {
@@ -142,6 +234,10 @@ export const COPY = {
   back: 'Back',
   minutes: (n: number) => `${n} min`,
 } as const;
+
+export function fmtNum(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
+}
 
 export function fmtDuration(ms: number): string {
   return ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.round(ms / 60_000)} min`;
@@ -161,3 +257,6 @@ export function fmtDay(iso: string): string {
   const d = new Date(iso);
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
+
+/** "Spark", or "Ocean look". */
+export const unlockName = (u: Unlock) => (u.kind === 'powerUp' ? COPY.game.powerUps[u.id].name : COPY.game.lookName(COPY.game.looks[u.id]));

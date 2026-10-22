@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type { StageId } from '../engine';
 import { STAGES, keysLetters, lastTest, planRound, shouldNudgeTest, todayStats } from '../engine';
+import { GAME_CONFIG, collectionTotal, masteredCount } from '../game';
 import type { ScreenProps } from './App';
+import { LevelBlock, WeekDots } from './GameParts';
 import { roundMinutesOverride } from './params';
 import { COPY, fmtDuration } from './copy';
 import { onControl, useKeydown } from './keys';
@@ -15,7 +17,7 @@ const STAGE_EXAMPLES: Record<StageId, string> = {
   sentences: 'the dog ran to',
 };
 
-export function Home({ profile, go, update }: ScreenProps) {
+export function Home({ profile, go, update, game }: ScreenProps) {
   const [showChoose, setShowChoose] = useState(false);
   const [now] = useState(() => Date.now());
   const s = profile.settings;
@@ -26,6 +28,8 @@ export function Home({ profile, go, update }: ScreenProps) {
   const today = todayStats(profile.rounds, now);
   const last = lastTest(profile);
   const nudge = shouldNudgeTest(profile, now);
+  const mastered = masteredCount(profile);
+  const showHeadStart = !!game.headStart && game.headStart.rounds > 0 && Object.keys(game.rounds).length === 0;
 
   useKeydown((e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || onControl(e)) return;
@@ -47,6 +51,9 @@ export function Home({ profile, go, update }: ScreenProps) {
 
   return (
     <section className="panel home">
+      <LevelBlock xp={game.xp} />
+      {showHeadStart && <p className="note" style={{ margin: 0 }} data-testid="head-start">{COPY.game.headStart(GAME_CONFIG.xp.headStartPerRound)}</p>}
+      <div className="divider" />
       <div>
         <h1>{COPY.home.title}</h1>
         <p className="muted">{COPY.home.lead}</p>
@@ -91,8 +98,16 @@ export function Home({ profile, go, update }: ScreenProps) {
               ))}
             </div>
           )}
+          <WeekDots game={game} rounds={profile.rounds} now={now} />
         </div>
         <div className="testcard">
+          <div className="label">{COPY.game.collection}</div>
+          <div className="ministars" data-testid="home-collection">
+            <b className="tnum">{mastered}</b>
+            <span className="muted">{COPY.game.ofTotal(collectionTotal)}</span>
+          </div>
+          <button className="linkbtn accent" onClick={() => go({ name: 'collection' })}>{COPY.game.seeCollection}</button>
+          <div className="divider" />
           <div className="label">{COPY.home.testLabel}</div>
           {nudge ? (
             <span className="nudge">{COPY.home.testNudge}</span>
@@ -106,6 +121,7 @@ export function Home({ profile, go, update }: ScreenProps) {
             <button className="btn ghost" onClick={() => go({ name: 'test', minutes: 3 })}>{COPY.minutes(3)}</button>
           </div>
           <span className="note">{COPY.home.testKeys}</span>
+          <span className="note">{COPY.game.testsNoXp}</span>
         </div>
       </div>
       <p className="muted" style={{ margin: 0 }} data-testid="today">{COPY.home.today(today.minutes, today.fixed)}</p>
