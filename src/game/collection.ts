@@ -1,13 +1,22 @@
 import type { Profile, StageId, TrackId } from '../engine';
 import { ALL_ITEMS, CONFIG, STAGES, TRACK_ITEMS } from '../engine';
+import type { GameState } from './state';
 
 export type DotState = 'mastered' | 'open' | 'locked';
+
+export interface CollectionItem {
+  key: string;
+  text: string;
+  state: DotState;
+  /** Mastered before, but the engine cleared it after a later miss: practice it again. */
+  again: boolean;
+}
 
 export interface CollectionSet {
   track: TrackId;
   /** Batch number within the track, from 0. */
   index: number;
-  items: { key: string; text: string; state: DotState }[];
+  items: CollectionItem[];
   mastered: number;
   open: boolean;
 }
@@ -20,16 +29,23 @@ export interface Zone {
   total: number;
 }
 
-export const masteredCount = (p: Profile) => ALL_ITEMS.filter((i) => p.items[i.key]?.mastered).length;
+const everSet = (g: GameState) => new Set(g.everMastered);
+
+/** Items ever mastered. It never goes down. */
+export const masteredCount = (g: GameState) => {
+  const ever = everSet(g);
+  return ALL_ITEMS.filter((i) => ever.has(i.key)).length;
+};
 
 export const collectionTotal = ALL_ITEMS.length;
 
 /**
- * The Collection, read straight from the engine. One dot per item; sets of 10 are the engine's
- * batches, open once the engine unlocked them. A set that spans two stages is drawn in the stage
- * that holds most of it (the first one on a tie).
+ * The Collection. One dot per item, filled once the item was ever mastered; sets of 10 are the
+ * engine's batches, open once the engine unlocked them. A set that spans two stages is drawn in
+ * the stage that holds most of it (the first one on a tie).
  */
-export function collection(p: Profile): Zone[] {
+export function collection(p: Profile, g: GameState): Zone[] {
+  const ever = everSet(g);
   const zones = new Map<StageId, Zone>(
     STAGES.map((s) => [
       s.id,
@@ -47,8 +63,9 @@ export function collection(p: Profile): Zone[] {
         open,
         mastered: 0,
         items: batch.map((i) => {
-          const m = !!p.items[i.key]?.mastered;
-          return { key: i.key, text: i.text, state: m ? 'mastered' : open ? 'open' : 'locked' };
+          const m = ever.has(i.key);
+          const now = !!p.items[i.key]?.mastered;
+          return { key: i.key, text: i.text, state: m ? 'mastered' : open ? 'open' : 'locked', again: m && !now };
         }),
       };
       set.mastered = set.items.filter((i) => i.state === 'mastered').length;
@@ -56,7 +73,7 @@ export function collection(p: Profile): Zone[] {
       for (const i of batch) byStage.set(i.stage, (byStage.get(i.stage) ?? 0) + 1);
       const home = [...byStage.entries()].reduce((a, c) => (c[1] > a[1] ? c : a))[0];
       zones.get(home)!.sets.push(set);
-      for (const i of batch) if (p.items[i.key]?.mastered) zones.get(i.stage)!.mastered++;
+      for (const i of batch) if (ever.has(i.key)) zones.get(i.stage)!.mastered++;
     }
   }
   return [...zones.values()];

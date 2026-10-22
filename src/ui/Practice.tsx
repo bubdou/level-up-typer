@@ -24,7 +24,7 @@ const bubbleText = (b: Bubble) =>
 export function Practice({ profile, go, changed, update, game, updateGame, look }: ScreenProps & { look: LookId }) {
   const s = profile.settings;
   // The scorer only listens to the engine's events; it never changes the round.
-  const [scorer] = useState(() => new RoundScorer(game.xp));
+  const [scorer] = useState(() => new RoundScorer(game.xp, game.everMastered));
   const [round] = useState(
     () =>
       new Round(profile, {

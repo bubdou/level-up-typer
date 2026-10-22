@@ -93,7 +93,7 @@ test('the Collection and Power-ups pages', async ({ page }) => {
   for (const z of ['Letter pairs', 'Short chunks', 'Common words', 'More words', 'Phrases', 'Sentences']) {
     await expect(c.getByRole('heading', { name: z })).toBeVisible();
   }
-  await expect(c.locator('svg.dot')).toHaveCount(476 + 3);
+  await expect(c.locator('svg.dot')).toHaveCount(476 + 4);
   // one open set per track at the start
   await expect(c.locator('.cset:not(:disabled)')).toHaveCount(3);
   await c.locator('.cset:not(:disabled)').first().click();

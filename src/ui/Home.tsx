@@ -28,7 +28,7 @@ export function Home({ profile, go, update, game }: ScreenProps) {
   const today = todayStats(profile.rounds, now);
   const last = lastTest(profile);
   const nudge = shouldNudgeTest(profile, now);
-  const mastered = masteredCount(profile);
+  const mastered = masteredCount(game);
   const showHeadStart = !!game.headStart && game.headStart.rounds > 0 && Object.keys(game.rounds).length === 0;
 
   useKeydown((e) => {

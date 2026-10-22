@@ -13,6 +13,7 @@ import {
   levelStart,
   masteredCount,
   newGameState,
+  syncEverMastered,
   unlocksBetween,
   weekKey,
   weekStreak,
@@ -322,15 +323,19 @@ describe('week goal', () => {
   });
 });
 
+const rec = (mastered: boolean) => ({ history: [], seen: 2, smoothRounds: mastered ? ['a', 'b'] : ['a'], mastered, weak: false });
+
 describe('Collection', () => {
-  it('has 476 dots, and the count is what the engine marks mastered', () => {
+  it('has 476 dots, filled from what the engine marks mastered', () => {
     expect(collectionTotal).toBe(476);
     const p = newProfile();
-    expect(masteredCount(p)).toBe(0);
-    for (const i of ALL_ITEMS.slice(0, 7)) p.items[i.key] = { history: [], seen: 2, smoothRounds: ['a', 'b'], mastered: true, weak: false };
-    p.items[ALL_ITEMS[8].key] = { history: [], seen: 2, smoothRounds: ['a'], mastered: false, weak: false };
-    expect(masteredCount(p)).toBe(7);
-    const zones = collection(p);
+    const g = newGameState();
+    expect(masteredCount(g)).toBe(0);
+    for (const i of ALL_ITEMS.slice(0, 7)) p.items[i.key] = rec(true);
+    p.items[ALL_ITEMS[8].key] = rec(false);
+    expect(syncEverMastered(g, p)).toBe(7);
+    expect(masteredCount(g)).toBe(7);
+    const zones = collection(p, g);
     expect(zones.reduce((a, z) => a + z.mastered, 0)).toBe(7);
     expect(zones.reduce((a, z) => a + z.total, 0)).toBe(476);
     expect(zones.map((z) => z.total)).toEqual([30, 35, 132, 179, 60, 40]);
@@ -339,7 +344,7 @@ describe('Collection', () => {
   it('sets are the engine batches, open as far as the engine unlocked', () => {
     const p = newProfile();
     p.unlocked = { chunks: 2, words: 1, flow: 1 };
-    const sets = collection(p).flatMap((z) => z.sets);
+    const sets = collection(p, newGameState()).flatMap((z) => z.sets);
     const bTrack = (t: string) => sets.filter((s) => s.track === t);
     expect(bTrack('chunks').length).toBe(Math.ceil(TRACK_ITEMS.chunks.length / 10));
     expect(bTrack('chunks').filter((s) => s.open).length).toBe(2);
@@ -351,9 +356,65 @@ describe('Collection', () => {
   it('a set across two stages sits in the stage with most of it', () => {
     // chunks track: 30 pairs then 35 short chunks, so batch 3 (items 30-39) is all short chunks;
     // words track: 132 common words, so batch 13 (130-139) has 2 common and 8 more words.
-    const zones = collection(newProfile());
+    const zones = collection(newProfile(), newGameState());
     const more = zones.find((z) => z.stage === 'more')!;
     expect(more.sets.some((s) => s.track === 'words' && s.index === 13)).toBe(true);
+  });
+});
+
+describe('dots never go down', () => {
+  const now = Date.parse('2026-10-21T10:00:00Z');
+  const key = ALL_ITEMS[0].key;
+  const text = ALL_ITEMS[0].text;
+  const m: ChunkEvent = { type: 'mastered', text, itemKey: key };
+
+  it('an item the engine un-masters after a miss stays counted, with a practice-again ring', () => {
+    const p = newProfile();
+    const g = newGameState();
+    p.items[key] = rec(true);
+    const s1 = new RoundScorer(g.xp, g.everMastered);
+    s1.onEvent(m);
+    finishRound(g, p, summaryOf({ id: 'a' }), s1, now);
+    expect(masteredCount(g)).toBe(1);
+    // a later miss: the engine clears mastered
+    p.items[key] = rec(false);
+    const s2 = new RoundScorer(g.xp, g.everMastered);
+    s2.onEvent(ev('error', { text }));
+    finishRound(g, p, summaryOf({ id: 'b' }), s2, now);
+    expect(masteredCount(g)).toBe(1);
+    const item = collection(p, g).flatMap((z) => z.sets).flatMap((st) => st.items).find((i) => i.key === key)!;
+    expect(item).toMatchObject({ state: 'mastered', again: true });
+  });
+
+  it('mastering it again removes the ring and gives no second +20', () => {
+    const p = newProfile();
+    const g = newGameState();
+    g.everMastered = [key];
+    p.items[key] = rec(true);
+    const s = new RoundScorer(g.xp, g.everMastered);
+    s.onEvent(m);
+    expect(s.xp.mastered).toBe(0);
+    expect(s.take().mastered).toBe(false);
+    const pts = finishRound(g, p, summaryOf(), s, now);
+    expect(pts.newlyMastered).toEqual([]);
+    const item = collection(p, g).flatMap((z) => z.sets).flatMap((st) => st.items).find((i) => i.key === key)!;
+    expect(item).toMatchObject({ state: 'mastered', again: false });
+  });
+
+  it('the same item mastered twice in one round pays once', () => {
+    const s = new RoundScorer(0);
+    s.onEvent(m);
+    s.onEvent(m);
+    expect(s.xp.mastered).toBe(20);
+  });
+
+  it('an old profile seeds the list from the engine once and keeps it', () => {
+    const p = newProfile();
+    for (const i of ALL_ITEMS.slice(0, 3)) p.items[i.key] = rec(true);
+    const g = newGameState();
+    expect(syncEverMastered(g, p)).toBe(3);
+    expect(syncEverMastered(g, p)).toBe(0);
+    expect(g.xp).toBe(0);
   });
 });
 

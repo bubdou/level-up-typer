@@ -203,6 +203,8 @@ export const COPY = {
     legendMastered: 'Mastered',
     legendOpen: 'Practicing',
     legendLocked: 'Not open yet',
+    legendAgain: 'Practice again',
+    practiceAgain: 'Practice again',
     setTitle: (zone: string, n: number) => `${zone}, set ${n}`,
     setCount: (n: number) => `${n} of 10 mastered`,
     setLocked: 'This set opens later.',

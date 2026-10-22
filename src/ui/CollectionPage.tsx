@@ -5,11 +5,15 @@ import type { ScreenProps } from './App';
 import { COPY } from './copy';
 import { onControl, useKeydown } from './keys';
 
-/** Filled, ring and short dash: the three states differ by shape as well as colour. */
-export function Dot({ state }: { state: DotState }) {
+/**
+ * Filled, ring and short dash: the three states differ by shape as well as colour. An item the
+ * engine needs practiced again keeps its filled dot and gets an outer ring.
+ */
+export function Dot({ state, again = false }: { state: DotState; again?: boolean }) {
   return (
-    <svg className={`dot ${state}`} viewBox="0 0 12 12" aria-hidden="true">
-      {state === 'mastered' && <circle cx="6" cy="6" r="5" />}
+    <svg className={`dot ${state}${again ? ' again' : ''}`} viewBox="0 0 12 12" aria-hidden="true">
+      {state === 'mastered' && (again ? <circle cx="6" cy="6" r="3" /> : <circle cx="6" cy="6" r="5" />)}
+      {again && <circle className="ring" cx="6" cy="6" r="5" fill="none" strokeWidth="1.6" />}
       {state === 'open' && <circle cx="6" cy="6" r="4" fill="none" strokeWidth="2" />}
       {state === 'locked' && <rect x="3" y="5" width="6" height="2" rx="1" />}
     </svg>
@@ -18,14 +22,14 @@ export function Dot({ state }: { state: DotState }) {
 
 const setId = (s: CollectionSet) => `${s.track}-${s.index}`;
 
-export function CollectionPage({ profile, go }: ScreenProps) {
+export function CollectionPage({ profile, go, game }: ScreenProps) {
   const [openSet, setOpenSet] = useState<string | null>(null);
   useKeydown((e) => {
     if (onControl(e)) return;
     if (e.key === 'Escape') go({ name: 'home' });
   });
-  const zones = collection(profile);
-  const n = masteredCount(profile);
+  const zones = collection(profile, game);
+  const n = masteredCount(game);
   const chosen = (() => {
     for (const z of zones) {
       const i = z.sets.findIndex((s) => setId(s) === openSet);
@@ -49,6 +53,7 @@ export function CollectionPage({ profile, go }: ScreenProps) {
           <span><Dot state="mastered" />{COPY.game.legendMastered}</span>
           <span><Dot state="open" />{COPY.game.legendOpen}</span>
           <span><Dot state="locked" />{COPY.game.legendLocked}</span>
+          <span><Dot state="mastered" again />{COPY.game.legendAgain}</span>
         </div>
         {zones.map((z) => (
           <div key={z.stage} className="zone" data-testid={`zone-${z.stage}`}>
@@ -70,7 +75,7 @@ export function CollectionPage({ profile, go }: ScreenProps) {
                     disabled={!s.open}
                     onClick={() => setOpenSet(id === openSet ? null : id)}
                   >
-                    {s.items.map((it) => <Dot key={it.key} state={it.state} />)}
+                    {s.items.map((it) => <Dot key={it.key} state={it.state} again={it.again} />)}
                   </button>
                 );
               })}
@@ -97,7 +102,10 @@ function SetDetail({ set, zone, number }: { set: CollectionSet; zone: string; nu
       <span className="note">{COPY.game.setCount(set.mastered)}</span>
       <div className="chips">
         {set.items.map((it) => (
-          <span key={it.key} className={`chip${it.state === 'mastered' ? ' star' : ''}`}>{it.text}</span>
+          <span key={it.key} className={`chip${it.state === 'mastered' ? ' star' : ''}${it.again ? ' again' : ''}`}>
+            {it.text}
+            {it.again && <small> · {COPY.game.practiceAgain}</small>}
+          </span>
         ))}
       </div>
     </>

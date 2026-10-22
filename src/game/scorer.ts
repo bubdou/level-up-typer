@@ -42,10 +42,14 @@ export class RoundScorer {
   private _combo = 0;
   private _shieldUsed = false;
   private chain = 0;
+  /** Item keys mastered for the first time ever in this round. */
+  readonly firstMastered: string[] = [];
+  private everMastered: ReadonlySet<string>;
   private pending: Feedback = { xp: 0, fixed: false, mastered: false, bubbles: [] };
 
-  constructor(xpBefore: number) {
+  constructor(xpBefore: number, everMastered: Iterable<string> = []) {
     this.xpBefore = xpBefore;
+    this.everMastered = new Set(everMastered);
   }
 
   get gained(): number {
@@ -119,6 +123,9 @@ export class RoundScorer {
         this.award('fixed', GAME_CONFIG.xp.fixed, 1);
         break;
       case 'mastered':
+        // Paid once per item: mastering it again after the engine cleared it earns nothing extra.
+        if (this.everMastered.has(e.itemKey) || this.firstMastered.includes(e.itemKey)) break;
+        this.firstMastered.push(e.itemKey);
         this.counts.mastered++;
         this.newlyMastered.push(e.text);
         this.pending.mastered = true;

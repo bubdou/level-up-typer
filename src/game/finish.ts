@@ -1,4 +1,5 @@
 import type { Profile, RoundSummary } from '../engine';
+import { ALL_ITEMS } from '../engine';
 import { GAME_CONFIG } from './config';
 import { levelOf } from './levels';
 import { hasPowerUp } from './powerups';
@@ -52,7 +53,25 @@ export function finishRound(g: GameState, profile: Profile, summary: RoundSummar
   };
   g.xp = points.xpAfter;
   g.rounds[summary.id] = points;
+  for (const k of scorer.firstMastered) if (!g.everMastered.includes(k)) g.everMastered.push(k);
+  syncEverMastered(g, profile);
   return points;
+}
+
+/**
+ * Adds every item the engine marks mastered now to the game's ever-mastered list. Used when an
+ * old profile first meets the game, and after each round so nothing is missed. Never removes.
+ */
+export function syncEverMastered(g: GameState, profile: Profile): number {
+  const have = new Set(g.everMastered);
+  let added = 0;
+  for (const i of ALL_ITEMS) {
+    if (profile.items[i.key]?.mastered && !have.has(i.key)) {
+      g.everMastered.push(i.key);
+      added++;
+    }
+  }
+  return added;
 }
 
 /**

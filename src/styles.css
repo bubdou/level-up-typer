@@ -285,6 +285,9 @@ select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid
 .dot.mastered { fill: var(--xp); }
 .dot.open { stroke: var(--xp); }
 .dot.locked { fill: var(--faint); }
+.dot.again .ring { stroke: var(--slow); }
+.chip.again { border-color: var(--slow); }
+.chip.again small { font-family: var(--font-ui); font-size: 12px; color: var(--slow); }
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; align-items: center; color: var(--muted); }
 .legend span { display: inline-flex; gap: 6px; align-items: center; }
 .setdetail { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 8px; }

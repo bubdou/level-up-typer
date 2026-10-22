@@ -42,6 +42,11 @@ export interface GameState {
   rounds: Record<string, RoundPoints>;
   /** Monday dates (YYYY-MM-DD, local) of weeks whose goal bonus was paid. */
   weekGoalsPaid: string[];
+  /**
+   * Item keys ever mastered. Never shrinks, so the Collection never goes down even when the
+   * engine clears an item's mastery after a later miss. Mastered XP is paid once per key.
+   */
+  everMastered: string[];
   /** Letter to the ISO time Key Finder last paid for it. */
   keyFinder: Record<string, string>;
   /** Set once, when the game first meets a profile. */
@@ -55,6 +60,7 @@ export function newGameState(): GameState {
     xp: 0,
     rounds: {},
     weekGoalsPaid: [],
+    everMastered: [],
     keyFinder: {},
     headStart: null,
     settings: { look: 'classic', sounds: true, animations: true, weekGoalDays: GAME_CONFIG.weekGoalDaysDefault },
@@ -70,6 +76,7 @@ export function migrateGame(raw: unknown): GameState | null {
     ...g,
     rounds: g.rounds ?? {},
     weekGoalsPaid: g.weekGoalsPaid ?? [],
+    everMastered: g.everMastered ?? [],
     keyFinder: g.keyFinder ?? {},
     settings: { ...fresh.settings, ...g.settings },
   };

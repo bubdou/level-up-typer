@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Profile, RoundSummary, TestComparison, TestRecord } from '../engine';
 import type { GameState, RoundPoints } from '../game';
-import { applyHeadStart, lookUnlocked, levelOf, newGameState } from '../game';
+import { applyHeadStart, lookUnlocked, levelOf, newGameState, syncEverMastered } from '../game';
 import { flush, loadGame, loadProfile, requestPersistence, saveGame, saveProfile, saveSoon } from '../storage/store';
 import { CollectionPage } from './CollectionPage';
 import { COPY } from './copy';
@@ -42,7 +42,9 @@ export interface ScreenProps {
 async function loadAll(): Promise<{ profile: Profile; game: GameState }> {
   const [profile, saved] = await Promise.all([loadProfile(), loadGame()]);
   const game = saved ?? newGameState();
-  if (applyHeadStart(game, profile, Date.now()) > 0 || !saved) void saveGame(game);
+  const headStart = applyHeadStart(game, profile, Date.now());
+  const seeded = syncEverMastered(game, profile);
+  if (headStart > 0 || seeded > 0 || !saved) void saveGame(game);
   return { profile, game };
 }
 
