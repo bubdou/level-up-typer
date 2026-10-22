@@ -104,6 +104,17 @@ describe('single letters earn about half', () => {
     expect(s.xp).toMatchObject({ letters: 5, fixedLetters: 10, smooth: 10 });
   });
 
+  it('the word "a" outside the warm-up is a whole word: 10, Spark and 15 for Fixed', () => {
+    const s = new RoundScorer(L(3));
+    s.onEvent(ev('smooth', { segment: 'chunks', text: 'a', start: 200, median: 500 }));
+    expect(s.take().xp).toBe(15);
+    s.onEvent(ev('smooth', { segment: 'flow', text: 'a' }));
+    expect(s.take().xp).toBe(10);
+    s.onEvent({ type: 'fixed', text: 'a', itemKey: null, segment: 'chunks' });
+    expect(s.take().xp).toBe(15);
+    expect(s.counts).toMatchObject({ letters: 0, fixedLetters: 0, smooth: 2, quick: 1, fixed: 1 });
+  });
+
   it('letters count toward Combo and their 5 is doubled', () => {
     const s = new RoundScorer(L(2));
     for (let i = 0; i < 10; i++) s.onEvent(letter('smooth'));

@@ -40,6 +40,9 @@ const zeroXp = (): RoundPoints['xp'] => ({
   weekGoal: 0,
 });
 
+/** A single letter in the Keys warm-up. The word "a" in Chunks or Flow is a whole word and scores as one. */
+const isWarmUpLetter = (e: { segment: string; text: string }) => e.segment === 'keys' && e.text.length === 1;
+
 /**
  * Turns one round's engine events into XP. It only listens: it never changes what the engine
  * picks, judges or repairs. Power-ups follow the level reached so far, so one that unlocks in the
@@ -99,7 +102,7 @@ export class RoundScorer {
       case 'smooth':
       case 'slow': {
         const mult = this.hot ? GAME_CONFIG.combo.multiplier : 1;
-        if (e.type === 'smooth' && e.text.length === 1) {
+        if (e.type === 'smooth' && isWarmUpLetter(e)) {
           this.counts.letters++;
           this.award('letters', GAME_CONFIG.xp.singleLetterSmooth, mult);
         } else if (e.type === 'smooth') {
@@ -135,7 +138,7 @@ export class RoundScorer {
       }
       case 'fixed':
         this.pending.fixed = true;
-        if (e.text.length === 1) {
+        if (isWarmUpLetter(e)) {
           this.counts.fixedLetters++;
           this.lastFixedXp = GAME_CONFIG.xp.singleLetterFixed;
           this.award('fixedLetters', this.lastFixedXp, 1);
