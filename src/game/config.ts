@@ -52,8 +52,11 @@ export const GAME_CONFIG = {
   weekGoalDaysOptions: [3, 4, 5, 7],
 
   // --- set challenge (M2b) ---
-  /** A set can be challenged once this many of its 10 items are mastered (the same 8 that opens the next set). */
-  challengeMinMastered: 8,
+  /**
+   * A set can be challenged once the share of its items that opens the next set is mastered
+   * (8 of 10). Sets with fewer items than this (the short last set of a track) have no challenge.
+   */
+  challengeMinItems: 5,
   /** Medals by the share of chunks typed clean on the first try. Bronze is for finishing the 45 s. */
   medalGold: 95,
   medalSilver: 85,

@@ -5,6 +5,8 @@ import {
   GAME_CONFIG,
   RoundScorer,
   applyHeadStart,
+  canChallenge,
+  challengeNeed,
   collection,
   collectionTotal,
   daysThisWeek,
@@ -564,6 +566,39 @@ describe('set challenge medals (M2b)', () => {
     expect(g.medals).toEqual({ 'chunks-0': 'gold' });
     expect(g.weekGoalsPaid).toEqual([]);
     expect(Object.keys(g.rounds)).toEqual([]);
+  });
+});
+
+describe('which sets can be challenged (M2b)', () => {
+  const sets = () => {
+    const p = newProfile();
+    p.unlocked = { chunks: 99, words: 99, flow: 99 };
+    return collection(p, newGameState()).flatMap((z) => z.sets);
+  };
+  const last = (track: string) => sets().filter((s) => s.track === track).sort((a, b) => b.index - a.index)[0];
+
+  it('needs the share that opens the next set, so short sets need fewer', () => {
+    const full = sets().find((s) => s.items.length === 10)!;
+    expect(challengeNeed(full)).toBe(8);
+    expect(challengeNeed({ items: new Array(5) })).toBe(4);
+    expect(challengeNeed({ items: new Array(4) })).toBeNull();
+    expect(challengeNeed({ items: new Array(1) })).toBeNull();
+  });
+
+  it('every real set of 5 or more items can reach its challenge', () => {
+    for (const s of sets()) {
+      const need = challengeNeed(s);
+      if (s.items.length < GAME_CONFIG.challengeMinItems) expect(need).toBeNull();
+      else expect(need).toBeLessThanOrEqual(s.items.length);
+    }
+    const lastChunks = last('chunks');
+    expect(lastChunks.items.length).toBe(TRACK_ITEMS.chunks.length % 10 || 10);
+    if (lastChunks.items.length >= GAME_CONFIG.challengeMinItems) {
+      const need = challengeNeed(lastChunks)!;
+      expect(canChallenge({ ...lastChunks, mastered: need - 1 })).toBe(false);
+      expect(canChallenge({ ...lastChunks, mastered: need })).toBe(true);
+      expect(canChallenge({ ...lastChunks, mastered: need, open: false })).toBe(false);
+    }
   });
 });
 

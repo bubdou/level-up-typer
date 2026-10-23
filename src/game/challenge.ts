@@ -1,4 +1,5 @@
 import type { RoundSummary, TestRecord } from '../engine';
+import { CONFIG } from '../engine';
 import { GAME_CONFIG } from './config';
 import type { CollectionSet } from './collection';
 import type { RoundScorer } from './scorer';
@@ -8,8 +9,17 @@ const RANK: Record<Medal, number> = { bronze: 1, silver: 2, gold: 3 };
 
 export const setId = (s: Pick<CollectionSet, 'track' | 'index'>) => `${s.track}-${s.index}`;
 
-/** A set can be challenged once 8 of its 10 items are mastered. */
-export const canChallenge = (s: CollectionSet) => s.open && s.mastered >= GAME_CONFIG.challengeMinMastered;
+/**
+ * How many mastered items a set needs before it can be challenged: the share that opens the next
+ * set, so 8 of 10 or 4 of 5. Null for a set too short to challenge.
+ */
+export const challengeNeed = (s: Pick<CollectionSet, 'items'>): number | null =>
+  s.items.length < GAME_CONFIG.challengeMinItems ? null : Math.ceil(CONFIG.unlockMasteredShare * s.items.length);
+
+export const canChallenge = (s: CollectionSet) => {
+  const need = challengeNeed(s);
+  return s.open && need !== null && s.mastered >= need;
+};
 
 /**
  * Gold: 95% clean on the first try, silver 85% (both with at least 10 chunks), bronze for

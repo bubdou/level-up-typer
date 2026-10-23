@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CollectionSet, DotState, Medal } from '../game';
-import { GAME_CONFIG, canChallenge, collection, collectionTotal, masteredCount, setId } from '../game';
+import { canChallenge, challengeNeed, collection, collectionTotal, masteredCount, setId } from '../game';
 import type { ScreenProps } from './App';
 import { COPY } from './copy';
 import { onControl, useKeydown } from './keys';
@@ -65,7 +65,7 @@ export function CollectionPage({ profile, go, game }: ScreenProps) {
               {z.sets.map((s, i) => {
                 const id = setId(s);
                 const medal = game.medals[id];
-                const label = `${COPY.game.setTitle(COPY.stages[z.stage], i + 1)}: ${s.open ? COPY.game.setCount(s.mastered) : COPY.game.setLocked}${medal ? `, ${COPY.game.medals[medal]}` : ''}`;
+                const label = `${COPY.game.setTitle(COPY.stages[z.stage], i + 1)}: ${s.open ? COPY.game.setCount(s.mastered, s.items.length) : COPY.game.setLocked}${medal ? `, ${COPY.game.medals[medal]}` : ''}`;
                 return (
                   <button
                     key={id}
@@ -110,11 +110,12 @@ function SetDetail({
   medal: Medal | null;
   onChallenge: () => void;
 }) {
+  const need = challengeNeed(set);
   return (
     <>
       <b>{COPY.game.setTitle(zone, number)}</b>
       <span className="note">
-        {COPY.game.setCount(set.mastered)}
+        {COPY.game.setCount(set.mastered, set.items.length)}
         {medal && ` · ${COPY.game.bestMedal(COPY.game.medals[medal])}`}
       </span>
       <div className="chips">
@@ -131,7 +132,7 @@ function SetDetail({
           <span className="note">{COPY.game.challengeLead}</span>
         </div>
       ) : (
-        set.open && <span className="note">{COPY.game.challengeLocked(GAME_CONFIG.challengeMinMastered)}</span>
+        set.open && need !== null && <span className="note">{COPY.game.challengeLocked(need, set.items.length)}</span>
       )}
     </>
   );
