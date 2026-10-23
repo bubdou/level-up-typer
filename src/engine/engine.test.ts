@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CHALLENGE_ID_PREFIX,
   CONFIG,
   Round,
   TRACK_ITEMS,
@@ -393,24 +394,52 @@ describe('set challenge (M2b)', () => {
     expect(p.rounds).toEqual([]);
   });
 
-  it('misses count as usual, but smooth results never master an item', () => {
+  const runChallenge = (p: Profile, seed: number) => {
+    const r = new Round(p, { minutes: 7, now: 0, rng: seeded(seed), segments: planChallenge(set) });
+    let t = 0;
+    for (let i = 0; i < 200 && !r.isFinished; i++) t = typeCurrent(r, t, { start: 200, gap: 120 });
+    r.finish();
+    return r;
+  };
+
+  it('two challenges alone never master an item', () => {
     const p = newProfile();
     const k = set[0];
-    p.items[k] = { history: [], seen: 3, smoothRounds: ['old'], mastered: false, weak: false };
-    for (let n = 0; n < 2; n++) {
-      const r = new Round(p, { minutes: 7, now: 0, rng: seeded(5 + n), segments: planChallenge(set) });
-      let t = 0;
-      for (let i = 0; i < 200 && !r.isFinished; i++) t = typeCurrent(r, t, { start: 200, gap: 120 });
-      r.finish();
-    }
+    const ids = [runChallenge(p, 5).id, runChallenge(p, 6).id];
+    expect(ids.every((id) => id.startsWith(CHALLENGE_ID_PREFIX))).toBe(true);
     expect(p.items[k].mastered).toBe(false);
-    expect(p.items[k].smoothRounds).toEqual(['old']);
-    expect(p.items[k].seen).toBeGreaterThan(3);
+    expect(p.items[k].smoothRounds).toEqual(ids);
+  });
 
+  it('a normal round then a challenge masters an item', () => {
+    const p = newProfile();
+    const k = set[0];
+    p.items[k] = { history: [], seen: 3, smoothRounds: ['r-normal'], mastered: false, weak: false };
+    runChallenge(p, 5);
+    expect(p.items[k].mastered).toBe(true);
+  });
+
+  it('a challenge then a normal round masters an item', () => {
+    const p = newProfile();
+    for (const it of [...TRACK_ITEMS.chunks, ...TRACK_ITEMS.words])
+      p.items[it.key] = { history: [], seen: 1, smoothRounds: [`${CHALLENGE_ID_PREFIX}x`], mastered: false, weak: false };
+    const r = roundOf(p);
+    let t = 0;
+    for (let i = 0; i < 6; i++) t = typeCurrent(r, t);
+    const counted = Object.entries(p.items).filter(([, rec]) => rec.smoothRounds.includes(r.id));
+    expect(counted.length).toBeGreaterThan(0);
+    for (const [key, rec] of counted) expect(rec.mastered, key).toBe(true);
+  });
+
+  it('a miss in a challenge still clears mastered and marks weak', () => {
+    const p = newProfile();
+    const k = set[0];
+    p.items[k] = { history: [], seen: 3, smoothRounds: ['a', 'b'], mastered: true, weak: false };
     const r = new Round(p, { minutes: 7, now: 0, rng: seeded(9), segments: planChallenge(set) });
     let t = 0;
     while (r.view(t).text !== ITEM_TEXT(k)) t = typeCurrent(r, t, { start: 200, gap: 120 });
     typeCurrent(r, t, { wrong: true });
+    expect(p.items[k].mastered).toBe(false);
     expect(p.items[k].weak).toBe(true);
     expect(p.items[k].smoothRounds).toEqual([]);
   });

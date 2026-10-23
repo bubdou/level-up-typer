@@ -106,14 +106,18 @@ export interface RoundView {
 
 export type KeyResult = 'ignored' | 'correct' | 'wrong' | 'done';
 
+/** Set challenge ids start with this, so mastery can tell them from normal rounds. */
+export const CHALLENGE_ID_PREFIX = 'ch-';
+export const isChallengeId = (id: string) => id.startsWith(CHALLENGE_ID_PREFIX);
+
 export class Round {
   readonly segments: Segment[];
   readonly id: string;
   readonly limitMs: number;
   /**
-   * A set challenge. Its chunks are judged and repaired like any round and misses count as usual,
-   * but a smooth result does not count toward mastery (two challenges in a row would otherwise
-   * master items without a later encounter), and it is not stored as a round.
+   * A set challenge. Its chunks are judged and repaired like any round and misses count as usual.
+   * A smooth result counts as one of the rounds mastery needs, but at least one of them must be a
+   * normal round, so two challenges alone never master an item. It is not stored as a round.
    */
   readonly challenge: boolean;
   private p: Profile;
@@ -168,10 +172,11 @@ export class Round {
     this.rng = opts.rng ?? Math.random;
     this.wall = opts.wallClock ?? Date.now;
     this.onEvent = opts.onEvent;
-    this.id = `r${this.wall().toString(36)}${Math.floor(this.rng() * 1e6).toString(36)}`;
     this.segments = opts.segments ?? planRound(profile, opts.minutes, opts.choose ?? null);
     this.limitMs = this.segments.reduce((a, s) => a + s.ms, 0);
     this.challenge = this.segments.some((s) => s.kind === 'set');
+    const stamp = `${this.wall().toString(36)}${Math.floor(this.rng() * 1e6).toString(36)}`;
+    this.id = this.challenge ? `${CHALLENGE_ID_PREFIX}${stamp}` : `r${stamp}`;
     this.huntAtStart = huntLetters(profile);
     this.hunt = new Set(this.huntAtStart);
     this.keysLetters = keysLetters(profile);
@@ -512,12 +517,11 @@ export class Round {
       rec.weak = true;
       return;
     }
-    if (this.challenge) return;
     const fixedAt = this.fixedAt.get(key);
     const tooSoon = fixedAt !== undefined && n - fixedAt - 1 <= CONFIG.masteryIgnoreAfterFix;
     if (tooSoon) return;
     if (!rec.smoothRounds.includes(this.id)) rec.smoothRounds.push(this.id);
-    if (!rec.mastered && rec.smoothRounds.length >= CONFIG.masteryRounds) {
+    if (!rec.mastered && rec.smoothRounds.length >= CONFIG.masteryRounds && rec.smoothRounds.some((id) => !isChallengeId(id))) {
       rec.mastered = true;
       rec.weak = false;
       const item = ITEM_BY_KEY.get(key);
