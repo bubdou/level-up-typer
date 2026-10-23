@@ -5,10 +5,16 @@ import {
   GAME_CONFIG,
   RoundScorer,
   applyHeadStart,
+  canChallenge,
+  challengeNeed,
   collection,
   collectionTotal,
   daysThisWeek,
+  finishChallenge,
   finishRound,
+  medalFor,
+  paceChars,
+  usualPace,
   levelOf,
   levelStart,
   masteredCount,
@@ -531,5 +537,93 @@ describe('config', () => {
   it('holds every number', () => {
     expect(GAME_CONFIG.xp).toMatchObject({ smooth: 10, slowClean: 5, fixed: 15, mastered: 20, weekGoal: 200, headStartPerRound: 300 });
     expect(GAME_CONFIG.weekGoalDaysDefault).toBe(4);
+  });
+});
+
+describe('set challenge medals (M2b)', () => {
+  const sum = (cleanRate: number, chunks = 20) => summaryOf({ kind: 'challenge', cleanRate, chunks, minutes: 0.75 });
+
+  it('gold 95%, silver 85%, bronze for finishing, nothing when stopped early', () => {
+    expect(medalFor(sum(95), true)).toBe('gold');
+    expect(medalFor(sum(94), true)).toBe('silver');
+    expect(medalFor(sum(85), true)).toBe('silver');
+    expect(medalFor(sum(84), true)).toBe('bronze');
+    expect(medalFor(sum(100, 9), true)).toBe('bronze');
+    expect(medalFor(sum(100), false)).toBeNull();
+  });
+
+  it('keeps the best medal, adds XP, and is not a week-goal day', () => {
+    const g = newGameState();
+    const s1 = new RoundScorer(0);
+    s1.onEvent(ev('smooth'));
+    const r1 = finishChallenge(g, 'chunks-0', sum(90), s1, true);
+    expect(r1).toMatchObject({ medal: 'silver', best: 'silver', improved: true });
+    expect(g.xp).toBe(10);
+    const r2 = finishChallenge(g, 'chunks-0', sum(50), new RoundScorer(g.xp), true);
+    expect(r2).toMatchObject({ medal: 'bronze', best: 'silver', improved: false });
+    const r3 = finishChallenge(g, 'chunks-0', sum(99), new RoundScorer(g.xp), true);
+    expect(r3).toMatchObject({ medal: 'gold', best: 'gold', improved: true });
+    expect(g.medals).toEqual({ 'chunks-0': 'gold' });
+    expect(g.weekGoalsPaid).toEqual([]);
+    expect(Object.keys(g.rounds)).toEqual([]);
+  });
+});
+
+describe('which sets can be challenged (M2b)', () => {
+  const sets = () => {
+    const p = newProfile();
+    p.unlocked = { chunks: 99, words: 99, flow: 99 };
+    return collection(p, newGameState()).flatMap((z) => z.sets);
+  };
+  const last = (track: string) => sets().filter((s) => s.track === track).sort((a, b) => b.index - a.index)[0];
+
+  it('needs the share that opens the next set, so short sets need fewer', () => {
+    const full = sets().find((s) => s.items.length === 10)!;
+    expect(challengeNeed(full)).toBe(8);
+    expect(challengeNeed({ items: new Array(5) })).toBe(4);
+    expect(challengeNeed({ items: new Array(4) })).toBeNull();
+    expect(challengeNeed({ items: new Array(1) })).toBeNull();
+  });
+
+  it('every real set of 5 or more items can reach its challenge', () => {
+    for (const s of sets()) {
+      const need = challengeNeed(s);
+      if (s.items.length < GAME_CONFIG.challengeMinItems) expect(need).toBeNull();
+      else expect(need).toBeLessThanOrEqual(s.items.length);
+    }
+    const lastChunks = last('chunks');
+    expect(lastChunks.items.length).toBe(TRACK_ITEMS.chunks.length % 10 || 10);
+    if (lastChunks.items.length >= GAME_CONFIG.challengeMinItems) {
+      const need = challengeNeed(lastChunks)!;
+      expect(canChallenge({ ...lastChunks, mastered: need - 1 })).toBe(false);
+      expect(canChallenge({ ...lastChunks, mastered: need })).toBe(true);
+      expect(canChallenge({ ...lastChunks, mastered: need, open: false })).toBe(false);
+    }
+  });
+});
+
+describe('usual-pace line (M2b)', () => {
+  const t = (minutes: number, wpm: number, day: number) => ({
+    id: `t${day}${minutes}`,
+    date: new Date(2026, 9, day, 10).toISOString(),
+    minutes,
+    wpm,
+    accuracy: 95,
+    correctChars: 0,
+    keystrokes: 0,
+    wrongKeys: 0,
+    errorsByKey: {},
+  });
+
+  it('is the average of the last 3 tests of the same length, and hidden with fewer', () => {
+    expect(usualPace([t(1, 10, 1), t(1, 12, 2)], 1)).toBeNull();
+    const tests = [t(1, 10, 1), t(1, 12, 2), t(3, 40, 3), t(1, 14, 4), t(1, 16, 5)];
+    expect(usualPace(tests, 1)).toBe(14);
+    expect(usualPace(tests, 3)).toBeNull();
+  });
+
+  it('moves 5 characters per word per minute', () => {
+    expect(paceChars(12, 60_000)).toBe(60);
+    expect(paceChars(12, 30_000)).toBe(30);
   });
 });

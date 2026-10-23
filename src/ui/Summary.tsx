@@ -2,35 +2,17 @@ import { useState } from 'react';
 import type { RoundSummary } from '../engine';
 import { previousRound } from '../engine';
 import type { RoundPoints } from '../game';
-import { GAME_CONFIG, levelOf, unlocksBetween } from '../game';
+import { GAME_CONFIG } from '../game';
+import { pointRows } from './points';
 import type { ScreenProps } from './App';
-import { COPY, fmtSeconds, unlockName } from './copy';
-import { GameIcon, LevelBlock, WeekDots } from './GameParts';
+import { COPY, fmtSeconds } from './copy';
+import { LevelBlock, UnlockCards, WeekDots } from './GameParts';
 import { onControl, useKeydown } from './keys';
-
-function pointRows(p: RoundPoints, weekDays: number): [string, string, string, number][] {
-  const x = GAME_CONFIG.xp;
-  const rows: [string, string, string, number][] = [
-    ['smooth', COPY.game.rows.smooth, COPY.game.times(p.counts.smooth, x.smooth), p.xp.smooth],
-    ['letters', COPY.game.rows.letters, COPY.game.times(p.counts.letters ?? 0, x.singleLetterSmooth), p.xp.letters ?? 0],
-    ['slowClean', COPY.game.rows.slowClean, COPY.game.times(p.counts.slowClean, x.slowClean), p.xp.slowClean],
-    ['quick', COPY.game.rows.quick, COPY.game.times(p.counts.quick, GAME_CONFIG.spark.xp), p.xp.quick],
-    ['fixed', COPY.game.rows.fixed, COPY.game.times(p.counts.fixed, x.fixed), p.xp.fixed],
-    ['fixedLetters', COPY.game.rows.fixedLetters, COPY.game.times(p.counts.fixedLetters ?? 0, x.singleLetterFixed), p.xp.fixedLetters ?? 0],
-    ['mastered', COPY.game.rows.mastered, COPY.game.times(p.counts.mastered, x.mastered), p.xp.mastered],
-    ['flowChain', COPY.game.rows.flowChain, COPY.game.times(p.counts.flowChain, GAME_CONFIG.flowChain.xp), p.xp.flowChain],
-    ['comboBonus', COPY.game.rows.comboBonus, COPY.game.doubled, p.xp.comboBonus],
-    ['keyFinder', COPY.game.rows.keyFinder, p.keysFound.join(' '), p.xp.keyFinder],
-    ['weekGoal', COPY.game.rows.weekGoal, COPY.game.weekDetail(weekDays), p.xp.weekGoal],
-  ];
-  return rows.filter((r) => r[3] > 0);
-}
 
 export function Summary({ profile, go, summary, points, game }: ScreenProps & { summary: RoundSummary; points: RoundPoints | null }) {
   const [now] = useState(() => Date.now());
   const prev = previousRound(profile, summary.id);
   const better = prev?.medStart != null && summary.medStart != null && summary.medStart < prev.medStart;
-  const unlocks = points ? unlocksBetween(levelOf(points.xpBefore), levelOf(points.xpAfter)) : [];
 
   useKeydown((e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || onControl(e)) return;
@@ -50,16 +32,7 @@ export function Summary({ profile, go, summary, points, game }: ScreenProps & { 
         <p className="muted">{COPY.summary.sub(summary.chunks, summary.minutes)}</p>
       </div>
       {points && <LevelBlock xp={points.xpAfter} fromXp={points.xpBefore} />}
-      {unlocks.map((u) => (
-        <div key={u.id} className="unlock" data-testid="unlock">
-          <div className="ic"><GameIcon id={u.kind === 'powerUp' ? u.id : 'look'} /></div>
-          <div>
-            <div className="label">{u.kind === 'powerUp' ? COPY.game.newPowerUp(u.level) : COPY.game.newLook(u.level)}</div>
-            <h2>{unlockName(u)}</h2>
-            <p className="muted">{u.kind === 'powerUp' ? COPY.game.powerUps[u.id].what : COPY.game.newLookText}</p>
-          </div>
-        </div>
-      ))}
+      {points && <UnlockCards fromXp={points.xpBefore} toXp={points.xpAfter} />}
       {points && (
         <div>
           <div className="label">{COPY.game.pointsTitle}</div>

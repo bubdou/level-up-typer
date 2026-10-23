@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CHALLENGE_ID_PREFIX,
   CONFIG,
   Round,
   TRACK_ITEMS,
@@ -14,6 +15,7 @@ import {
   letterState,
   measureChunk,
   newProfile,
+  planChallenge,
   planRound,
   saveTest,
   testScore,
@@ -55,6 +57,8 @@ function typeCurrent(r: Round, t: number, { start = 300, gap = 150, wrong = fals
   r.key(' ', now);
   return now;
 }
+
+const ITEM_TEXT = (key: string) => key.slice(key.indexOf(':') + 1);
 
 const longChunks: Segment[] = [{ kind: 'chunks', ms: 60 * 60_000 }];
 
@@ -368,6 +372,76 @@ describe('fields for the game layer (M2)', () => {
     const s = r.finish()!;
     expect(s.huntLettersAtStart).toEqual(['q']);
     expect(s.huntLetters).toEqual([]);
+  });
+});
+
+describe('set challenge (M2b)', () => {
+  const set = TRACK_ITEMS.chunks.slice(0, 10).map((i) => i.key);
+
+  it('only uses the set, runs 45 s, and is not stored as a round', () => {
+    const p = newProfile();
+    const r = new Round(p, { minutes: 7, now: 0, rng: seeded(3), segments: planChallenge(set) });
+    expect(r.limitMs).toBe(45_000);
+    const texts = new Set(TRACK_ITEMS.chunks.slice(0, 10).map((i) => i.text));
+    let t = 0;
+    for (let i = 0; i < 500 && !r.isFinished; i++) {
+      expect(texts.has(r.view(t).text)).toBe(true);
+      t = typeCurrent(r, t, { start: 200, gap: 120 });
+      r.tick(t);
+    }
+    const s = r.finish()!;
+    expect(s.kind).toBe('challenge');
+    expect(p.rounds).toEqual([]);
+  });
+
+  const runChallenge = (p: Profile, seed: number) => {
+    const r = new Round(p, { minutes: 7, now: 0, rng: seeded(seed), segments: planChallenge(set) });
+    let t = 0;
+    for (let i = 0; i < 200 && !r.isFinished; i++) t = typeCurrent(r, t, { start: 200, gap: 120 });
+    r.finish();
+    return r;
+  };
+
+  it('two challenges alone never master an item', () => {
+    const p = newProfile();
+    const k = set[0];
+    const ids = [runChallenge(p, 5).id, runChallenge(p, 6).id];
+    expect(ids.every((id) => id.startsWith(CHALLENGE_ID_PREFIX))).toBe(true);
+    expect(p.items[k].mastered).toBe(false);
+    expect(p.items[k].smoothRounds).toEqual(ids);
+  });
+
+  it('a normal round then a challenge masters an item', () => {
+    const p = newProfile();
+    const k = set[0];
+    p.items[k] = { history: [], seen: 3, smoothRounds: ['r-normal'], mastered: false, weak: false };
+    runChallenge(p, 5);
+    expect(p.items[k].mastered).toBe(true);
+  });
+
+  it('a challenge then a normal round masters an item', () => {
+    const p = newProfile();
+    for (const it of [...TRACK_ITEMS.chunks, ...TRACK_ITEMS.words])
+      p.items[it.key] = { history: [], seen: 1, smoothRounds: [`${CHALLENGE_ID_PREFIX}x`], mastered: false, weak: false };
+    const r = roundOf(p);
+    let t = 0;
+    for (let i = 0; i < 6; i++) t = typeCurrent(r, t);
+    const counted = Object.entries(p.items).filter(([, rec]) => rec.smoothRounds.includes(r.id));
+    expect(counted.length).toBeGreaterThan(0);
+    for (const [key, rec] of counted) expect(rec.mastered, key).toBe(true);
+  });
+
+  it('a miss in a challenge still clears mastered and marks weak', () => {
+    const p = newProfile();
+    const k = set[0];
+    p.items[k] = { history: [], seen: 3, smoothRounds: ['a', 'b'], mastered: true, weak: false };
+    const r = new Round(p, { minutes: 7, now: 0, rng: seeded(9), segments: planChallenge(set) });
+    let t = 0;
+    while (r.view(t).text !== ITEM_TEXT(k)) t = typeCurrent(r, t, { start: 200, gap: 120 });
+    typeCurrent(r, t, { wrong: true });
+    expect(p.items[k].mastered).toBe(false);
+    expect(p.items[k].weak).toBe(true);
+    expect(p.items[k].smoothRounds).toEqual([]);
   });
 });
 

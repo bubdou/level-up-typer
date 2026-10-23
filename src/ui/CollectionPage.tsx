@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { CollectionSet, DotState } from '../game';
-import { collection, collectionTotal, masteredCount } from '../game';
+import type { CollectionSet, DotState, Medal } from '../game';
+import { canChallenge, challengeNeed, collection, collectionTotal, masteredCount, setId } from '../game';
 import type { ScreenProps } from './App';
 import { COPY } from './copy';
 import { onControl, useKeydown } from './keys';
@@ -20,9 +20,9 @@ export function Dot({ state, again = false }: { state: DotState; again?: boolean
   );
 }
 
-const setId = (s: CollectionSet) => `${s.track}-${s.index}`;
-
 export function CollectionPage({ profile, go, game }: ScreenProps) {
+  const challenge = (c: { set: CollectionSet; zone: string; number: number }) =>
+    go({ name: 'challenge', challenge: { set: setId(c.set), items: c.set.items.map((i) => i.key), label: COPY.game.setTitle(c.zone, c.number) } });
   const [openSet, setOpenSet] = useState<string | null>(null);
   useKeydown((e) => {
     if (onControl(e)) return;
@@ -64,7 +64,8 @@ export function CollectionPage({ profile, go, game }: ScreenProps) {
             <div className="sets">
               {z.sets.map((s, i) => {
                 const id = setId(s);
-                const label = `${COPY.game.setTitle(COPY.stages[z.stage], i + 1)}: ${s.open ? COPY.game.setCount(s.mastered) : COPY.game.setLocked}`;
+                const medal = game.medals[id];
+                const label = `${COPY.game.setTitle(COPY.stages[z.stage], i + 1)}: ${s.open ? COPY.game.setCount(s.mastered, s.items.length) : COPY.game.setLocked}${medal ? `, ${COPY.game.medals[medal]}` : ''}`;
                 return (
                   <button
                     key={id}
@@ -76,6 +77,7 @@ export function CollectionPage({ profile, go, game }: ScreenProps) {
                     onClick={() => setOpenSet(id === openSet ? null : id)}
                   >
                     {s.items.map((it) => <Dot key={it.key} state={it.state} again={it.again} />)}
+                    {medal && <i className={`medal ${medal}`} aria-hidden="true" />}
                   </button>
                 );
               })}
@@ -84,7 +86,7 @@ export function CollectionPage({ profile, go, game }: ScreenProps) {
         ))}
         <div className="setdetail" data-testid="set-detail">
           {chosen ? (
-            <SetDetail {...chosen} />
+            <SetDetail {...chosen} medal={game.medals[setId(chosen.set)] ?? null} onChallenge={() => challenge(chosen)} />
           ) : (
             <span className="note">{COPY.game.pickSet}</span>
           )}
@@ -95,11 +97,27 @@ export function CollectionPage({ profile, go, game }: ScreenProps) {
   );
 }
 
-function SetDetail({ set, zone, number }: { set: CollectionSet; zone: string; number: number }) {
+function SetDetail({
+  set,
+  zone,
+  number,
+  medal,
+  onChallenge,
+}: {
+  set: CollectionSet;
+  zone: string;
+  number: number;
+  medal: Medal | null;
+  onChallenge: () => void;
+}) {
+  const need = challengeNeed(set);
   return (
     <>
       <b>{COPY.game.setTitle(zone, number)}</b>
-      <span className="note">{COPY.game.setCount(set.mastered)}</span>
+      <span className="note">
+        {COPY.game.setCount(set.mastered, set.items.length)}
+        {medal && ` · ${COPY.game.bestMedal(COPY.game.medals[medal])}`}
+      </span>
       <div className="chips">
         {set.items.map((it) => (
           <span key={it.key} className={`chip${it.state === 'mastered' ? ' star' : ''}${it.again ? ' again' : ''}`}>
@@ -108,6 +126,14 @@ function SetDetail({ set, zone, number }: { set: CollectionSet; zone: string; nu
           </span>
         ))}
       </div>
+      {canChallenge(set) ? (
+        <div className="row">
+          <button className="btn ghost" onClick={onChallenge} data-testid="challenge">{COPY.game.challengeButton}</button>
+          <span className="note">{COPY.game.challengeLead}</span>
+        </div>
+      ) : (
+        set.open && need !== null && <span className="note">{COPY.game.challengeLocked(need, set.items.length)}</span>
+      )}
     </>
   );
 }

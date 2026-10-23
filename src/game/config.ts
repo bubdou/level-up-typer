@@ -51,6 +51,22 @@ export const GAME_CONFIG = {
   weekGoalDaysDefault: 4,
   weekGoalDaysOptions: [3, 4, 5, 7],
 
+  // --- set challenge (M2b) ---
+  /**
+   * A set can be challenged once the share of its items that opens the next set is mastered
+   * (8 of 10). Sets with fewer items than this (the short last set of a track) have no challenge.
+   */
+  challengeMinItems: 5,
+  /** Medals by the share of chunks typed clean on the first try. Bronze is for finishing the 45 s. */
+  medalGold: 95,
+  medalSilver: 85,
+  /** Gold and silver need at least this many chunks, so a few lucky chunks do not win gold. */
+  medalMinChunks: 10,
+
+  // --- usual-pace line in tests (M2b) ---
+  /** The pace line follows the average of this many recent tests of the same length. */
+  paceTests: 3,
+
   // --- in-round feedback (ms) ---
   /** Small "+10" next to the chunk strip. */
   popMs: 900,

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RoundView } from '../engine';
-import { CONFIG, Round, keysLetters, knownShare, letterState } from '../engine';
+import { CONFIG, Round, keysLetters, knownShare, letterState, planChallenge } from '../engine';
 import type { Bubble, LookId } from '../game';
-import { GAME_CONFIG, RoundScorer, finishRound, hasPowerUp } from '../game';
-import type { ScreenProps } from './App';
+import { GAME_CONFIG, RoundScorer, finishChallenge, finishRound, hasPowerUp } from '../game';
+import type { ChallengeSpec, ScreenProps } from './App';
 import { roundMinutesOverride } from './params';
 import { COPY, fmtClock, unlockName } from './copy';
 import { GameIcon } from './GameParts';
@@ -21,7 +21,17 @@ const bubbleText = (b: Bubble) =>
       ? COPY.game.shieldKept
       : COPY.game.levelUp(b.level, b.unlocks.length ? b.unlocks.map(unlockName).join(', ') : null);
 
-export function Practice({ profile, go, changed, update, game, updateGame, look }: ScreenProps & { look: LookId }) {
+/** Today's round, or a set challenge when `challenge` is given (same screen, same rules). */
+export function Practice({
+  profile,
+  go,
+  changed,
+  update,
+  game,
+  updateGame,
+  look,
+  challenge,
+}: ScreenProps & { look: LookId; challenge?: ChallengeSpec }) {
   const s = profile.settings;
   // The scorer only listens to the engine's events; it never changes the round.
   const [scorer] = useState(() => new RoundScorer(game.xp, game.everMastered));
@@ -31,6 +41,7 @@ export function Practice({ profile, go, changed, update, game, updateGame, look 
         minutes: roundMinutesOverride() ?? s.roundMinutes,
         choose: s.choose,
         now: performance.now(),
+        segments: challenge ? planChallenge(challenge.items) : undefined,
         onEvent: (e) => scorer.onEvent(e),
       }),
   );
@@ -48,8 +59,15 @@ export function Practice({ profile, go, changed, update, game, updateGame, look 
   const end = () => {
     if (endedRef.current) return;
     endedRef.current = true;
+    const timeUp = round.view(performance.now()).activeMs >= round.limitMs;
     const summary = round.finish();
     changed({ now: true });
+    if (challenge) {
+      if (!summary) return go({ name: 'collection' });
+      const result = finishChallenge(game, challenge.set, summary, scorer, timeUp);
+      updateGame(() => {});
+      return go({ name: 'challengeResult', challenge, summary, result });
+    }
     const points = summary ? finishRound(game, profile, summary, scorer, Date.now()) : null;
     if (points) updateGame(() => {});
     go(summary ? { name: 'summary', summary, points } : { name: 'home' });
@@ -152,7 +170,7 @@ export function Practice({ profile, go, changed, update, game, updateGame, look 
   const lit = v.interstitial || v.paused || hintDelay === null ? null : hintDelay === 0 || litStamp === v.charSince ? v.expected : null;
   const segLabel = (i: number) => {
     const seg = v.segments[i];
-    return seg.kind === 'chosen' ? COPY.stages[seg.stage!] : COPY.segments[seg.kind];
+    return seg.kind === 'chosen' ? COPY.stages[seg.stage!] : seg.kind === 'set' ? COPY.game.challengeTitle(challenge?.label ?? '') : COPY.segments[seg.kind];
   };
   const err = errAt && errAt.pos === v.pos && errAt.seq === v.seq ? errAt : null;
 

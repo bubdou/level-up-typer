@@ -85,6 +85,10 @@ export const CONFIG = {
   fixedToastMs: 800,
   giveUpToastMs: 1200,
 
+  // --- set challenge (M2b) ---
+  /** A set challenge mixes one set's 10 items for this long. */
+  challengeMs: 45_000,
+
   // --- test ---
   testDurations: [1, 3] as const,
   testNudgeDays: 3,

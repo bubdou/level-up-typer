@@ -38,7 +38,7 @@ export const COPY = {
     sentences: 'Sentences',
   } as Record<string, string>,
 
-  segments: { keys: 'Keys', chunks: 'Chunks', flow: 'Flow' } as Record<string, string>,
+  segments: { keys: 'Keys', chunks: 'Chunks', flow: 'Flow', set: 'Challenge' } as Record<string, string>,
 
   practice: {
     keysTitle: 'Keys: find these keys',
@@ -128,6 +128,7 @@ export const COPY = {
     resetDone: 'Progress cleared.',
     storageNote: 'Progress is saved in this browser.',
     look: 'Look',
+    paceLine: 'Usual-pace line in tests',
     lookLocked: (name: string, level: number) => `${name} (level ${level})`,
     sounds: 'Sounds',
     animations: 'Animations',
@@ -208,10 +209,28 @@ export const COPY = {
     legendAgain: 'Practice again',
     practiceAgain: 'Practice again',
     setTitle: (zone: string, n: number) => `${zone}, set ${n}`,
-    setCount: (n: number) => `${n} of 10 mastered`,
+    setCount: (n: number, size: number) => `${n} of ${size} mastered`,
     setLocked: 'This set opens later.',
     setComplete: 'Set complete. A new set is open.',
     pickSet: 'Pick a set to see what is in it.',
+    // set challenge (M2b)
+    challengeTitle: (set: string) => `${set} challenge`,
+    challengeLead: 'Type this set mixed together for 45 seconds. Same rules: a wrong key still means fix it.',
+    challengeButton: 'Challenge this set',
+    challengeLocked: (n: number, size: number) => `Master ${n} of ${size} to challenge this set.`,
+    medalRules: 'Gold: 95% clean on the first try. Silver: 85%. Bronze: finish it. You can try again any time; your best medal stays.',
+    medals: { gold: 'Gold', silver: 'Silver', bronze: 'Bronze' } as Record<string, string>,
+    bestMedal: (m: string) => `Best: ${m}`,
+    newBestMedal: 'New best medal!',
+    noMedal: 'Stopped early, so no medal this time.',
+    challengeSub: (chunks: number, clean: number) => `${chunks} chunks, ${clean}% clean on the first try.`,
+    tryAgain: 'Try again',
+    backToCollection: 'Done',
+    challengeHelp: 'Enter: Done · R: Try again',
+    // test pace line (M2b)
+    paceKey: 'Your usual pace',
+    paceAhead: 'Ahead of your usual pace',
+    paceNote: (wpm: number) => `The gold mark moves at ${wpm} wpm, the average of your last 3 tests.`,
     // power-ups
     powerUpsTitle: 'Power-ups',
     powerUpsLead: 'Power-ups give points or looks. None of them skip a fix.',

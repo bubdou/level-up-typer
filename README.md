@@ -37,6 +37,7 @@ PW_WEBKIT=1 npm run e2e   # include WebKit (Safari's engine) locally
   - `finish.ts` end-of-round bonuses (Key Finder, week goal) and the one-time head start.
   - `collection.ts` the Collection, read from the engine's mastered items and batches.
   - `week.ts` practice days and the Monday-to-Sunday week.
+  - `challenge.ts` (M2b) set-challenge medals and the usual-pace line for tests.
 - `src/data/wordlists.ts` practice content and its sources.
 - `src/ui/` React screens. All English text is in `src/ui/copy.ts`.
 - `src/storage/` saves the profile and, as a separate document, the game state in IndexedDB (localStorage fallback).
