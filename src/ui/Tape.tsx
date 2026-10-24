@@ -54,12 +54,17 @@ export function Tape({
   }, [current.id]);
 
   useEffect(() => {
+    // Watch the strip itself, not the window: Safari can report the new window size before the
+    // strip has its new width, which left the current chunk off its mark after a resize.
     const onResize = () => place(true);
-    window.addEventListener('resize', onResize);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onResize);
+    if (ro && winRef.current) ro.observe(winRef.current);
+    else window.addEventListener('resize', onResize);
     let live = true;
     document.fonts?.ready.then(() => live && place(true));
     return () => {
       live = false;
+      ro?.disconnect();
       window.removeEventListener('resize', onResize);
     };
   }, []);
