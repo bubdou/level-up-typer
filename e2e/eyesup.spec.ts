@@ -43,17 +43,26 @@ test('the keyboard shows letters, then colours only, then tucks away as letters 
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
-  await editProfile(page, `for (const l of 'abcdefghijklmnopqrstu') p.letters[l] = { pauses: Array(10).fill(100), knownStreak: 2 };`);
+  await editProfile(page, `for (const l of 'abcdefghijklmnopqrstuvwxyz') p.letters[l] = { pauses: Array(10).fill(100), knownStreak: 2 };`);
   await page.keyboard.press('Enter');
   await expect(keyboard(page)).toHaveAttribute('data-level', 'tucked');
   await expect(keyboard(page)).toHaveAttribute('data-tucked', 'true');
   await expect(page.getByText('Keyboard tucked away. It pops up if you get stuck.')).toBeVisible();
 
-  // stuck for 2 s: it pops up; the right key tucks it away again
+  // stuck for 2 s on a known letter: it pops up; the right key tucks it away again
+  // (freezeClock moves the clock on 1 s, so type a key first to start the wait from zero)
   await freezeClock(page);
+  do {
+    const e0 = (await expected(page))!;
+    await page.keyboard.press(e0 === ' ' ? 'Space' : e0);
+    await page.clock.runFor(50);
+  } while ((await expected(page)) === ' ');
   await page.clock.runFor(2300);
   await expect(keyboard(page)).toHaveAttribute('data-tucked', 'false');
+  // known letters wait 3 s for a hint, but a popped keyboard lights the key at once
   const e1 = (await expected(page))!;
+  await expect(page.locator('.key.lit')).toHaveAttribute('data-k', e1);
+  await expect(page.getByTestId('finger-line')).not.toBeEmpty();
   await page.keyboard.press(e1 === ' ' ? 'Space' : e1);
   await page.clock.runFor(250);
   await expect(keyboard(page)).toHaveAttribute('data-tucked', 'true');

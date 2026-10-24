@@ -174,13 +174,14 @@ export function Practice({
 
   const err = errAt && errAt.pos === v.pos && errAt.seq === v.seq ? errAt : null;
   const hidden = !!v.interstitial || v.paused;
-  // After a wrong key the right key lights at once, whatever the delay.
-  // Delayed hints follow the 200 ms redraw, like the keyboard's pop-up.
-  const lit = hidden || hintDelay === null ? null : now - v.charSince >= hintDelay || err ? v.expected : null;
   // The keyboard steps away as letters become known; the Keys warm-up and "Always" keep it whole.
   const kbLevel = v.mode === 'keys' || s.hints === 'always' ? 'labels' : keyboardLevel(profile);
   const popped =
     kbLevel === 'tucked' && s.hints !== 'off' && !hidden && (!!err || now - v.charSince >= CONFIG.keyboardPopUpMs);
+  // After a wrong key, or when the tucked keyboard pops up, the right key lights at once, whatever
+  // the delay: a popped keyboard with nothing lit would not help. Delayed hints follow the 200 ms redraw.
+  const lit =
+    hidden || hintDelay === null ? null : now - v.charSince >= hintDelay || err || popped ? v.expected : null;
   const wrongKey = err && now - err.at < CONFIG.wrongKeyFlashMs ? err.key : null;
   const kbLine = hidden ? '' : err ? wrongLine(err.key, v.expected) : lit ? fingerLine(lit) : '';
   const segLabel = (i: number) => {
