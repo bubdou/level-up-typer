@@ -71,9 +71,14 @@ test('1024x768 shows several whole chunks ahead before the fade; 400px has no si
   expect(clear(g)).toBeGreaterThanOrEqual(4);
 
   await page.setViewportSize({ width: 400, height: 760 });
-  await slideDone(page);
+  // The strip re-places itself when its own size changes, which can land a frame after the resize.
+  await expect
+    .poll(async () => {
+      const x = await geometry(page);
+      return Math.abs(x.curLeft - x.winLeft - 0.22 * x.winWidth);
+    })
+    .toBeLessThanOrEqual(2);
   g = await geometry(page);
-  expect(Math.abs(g.curLeft - g.winLeft - 0.22 * g.winWidth)).toBeLessThanOrEqual(2);
   expect(clear(g)).toBeGreaterThanOrEqual(1);
   const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
