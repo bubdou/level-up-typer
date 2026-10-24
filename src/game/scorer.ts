@@ -108,8 +108,9 @@ export class RoundScorer {
         } else if (e.type === 'smooth') {
           this.counts.smooth++;
           this.award('smooth', GAME_CONFIG.xp.smooth, mult);
-          // Spark trains starting a chunk without stopping first, so the Keys warm-up does not count.
-          if (hasPowerUp(lv, 'spark') && e.segment !== 'keys' && e.quickStart === true) {
+          // Spark pays for ⚡, a no-stop start: the learner read the chunk while finishing the one
+          // before it. The engine never judges ⚡ in the Keys warm-up.
+          if (hasPowerUp(lv, 'spark') && e.segment !== 'keys' && e.handoff === true) {
             this.counts.quick++;
             this.award('quick', GAME_CONFIG.spark.xp, mult);
           }

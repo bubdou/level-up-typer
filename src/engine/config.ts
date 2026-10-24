@@ -85,6 +85,21 @@ export const CONFIG = {
   fixedToastMs: 800,
   giveUpToastMs: 1200,
 
+  // --- read ahead ---
+  /** Chunks after the current one that the strip can show. */
+  aheadChunks: 8,
+  /** In the Keys warm-up only a few, since its letter groups change with time in the segment. */
+  aheadChunksKeys: 3,
+  /** No-stop start (⚡): the next chunk's first key comes within this many times the personal ms per key. */
+  handoffFactor: 1.5,
+  /** Recent ⚡ judgments kept per kind (chunks and words, flow). */
+  handoffWindow: 100,
+  /** Fewer judgments than this and the next-chunk cue stays strong. */
+  handoffMinJudged: 30,
+  /** ⚡ rate at which the next-chunk cue turns soft, and at which it turns off. */
+  cueSoftAt: 0.5,
+  cueOffAt: 0.7,
+
   // --- set challenge (M2b) ---
   /** A set challenge mixes one set's 10 items for this long. */
   challengeMs: 45_000,
