@@ -66,15 +66,16 @@ test('chunk strip, wrong keys, repair bay and Fixed!', async ({ page }) => {
   await page.keyboard.press('Enter');
   const cur = page.getByTestId('current');
   const text = (await cur.getAttribute('data-text'))!;
-  await expect(page.getByTestId('next').locator('span')).toHaveCount(2);
-  await expect(page.getByTestId('next').locator('.n1')).not.toHaveText('');
+  await expect(page.getByTestId('ahead')).toHaveCount(8);
+  await expect(page.locator('[data-testid="ahead"][data-cue]')).toHaveCount(0);
 
   await page.keyboard.press(wrongFor(text[0]));
   await expect(cur).toHaveAttribute('data-pos', '0');
   await expect(cur.locator('.ch.err')).toHaveCount(1);
   await page.keyboard.press(text[0]);
   await expect(cur).toHaveAttribute('data-pos', '1');
-  await expect(page.getByTestId('next').locator('.n1.lit')).toHaveCount(1);
+  // a new learner: the next chunk lights up strongly once the first key is down
+  await expect(page.getByTestId('ahead').first()).toHaveAttribute('data-cue', 'strong');
   await typeChunk(page);
 
   await expect(page.getByTestId('repair')).toBeVisible();
@@ -86,7 +87,8 @@ test('chunk strip, wrong keys, repair bay and Fixed!', async ({ page }) => {
   await typeChunk(page);
   await expect(page.getByText('Fixed!')).toBeVisible();
   await expect(page.getByTestId('repair')).toHaveCount(0);
-  await expect(page.getByTestId('prev')).toContainText(text);
+  await expect(page.getByTestId('done-chunk').last()).toHaveAttribute('data-text', text);
+  await expect(page.getByTestId('done-chunk').last().locator('.mk')).toHaveText('✕');
   await page.clock.runFor(1000);
   await expect(page.getByText('Fixed!')).toHaveCount(0);
 });

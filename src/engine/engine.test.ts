@@ -808,3 +808,152 @@ describe('content and boundaries', () => {
     }
   });
 });
+
+describe('the strip: chunks ahead keep their ids', () => {
+  it('shows 8 chunks ahead; each step drops the first and adds one at the end', () => {
+    const p = newProfile();
+    const r = roundOf(p, { seed: 3 });
+    let t = 0;
+    let v = r.view(t);
+    expect(v.next).toHaveLength(CONFIG.aheadChunks);
+    for (let i = 0; i < 20; i++) {
+      const before = v;
+      t = typeCurrent(r, t);
+      v = r.view(t);
+      expect(v.id).toBe(before.next[0].id);
+      expect(v.text).toBe(before.next[0].text);
+      expect(v.next.slice(0, -1)).toEqual(before.next.slice(1));
+      expect(v.done.map((d) => d.id).at(-1)).toBe(before.id);
+    }
+    expect(v.done).toHaveLength(20);
+    const ids = [...v.done.map((d) => d.id), v.id, ...v.next.map((n) => n.id)];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('shows only 3 ahead in the Keys warm-up', () => {
+    const p = newProfile();
+    const r = roundOf(p, { segments: [{ kind: 'keys', ms: 60_000 }] });
+    expect(r.view(0).next).toHaveLength(CONFIG.aheadChunksKeys);
+  });
+
+  it('a repair keeps the chunk id; the done list starts over in a new segment', () => {
+    const p = newProfile();
+    const r = roundOf(p, { segments: [{ kind: 'chunks', ms: 3000 }, { kind: 'chunks', ms: 60_000 }] });
+    const id = r.view(0).id;
+    let t = typeCurrent(r, 0, { wrong: true });
+    expect(r.view(t).repair).not.toBeNull();
+    expect(r.view(t).id).toBe(id);
+    for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+    expect(r.view(t).repair).toBeNull();
+    expect(r.view(t).done.map((d) => d.id)).toEqual([id]);
+    for (let i = 0; i < 20 && r.view(t).segIndex === 0; i++) t = typeCurrent(r, t);
+    t += CONFIG.segmentBreakMs;
+    expect(r.view(t).segIndex).toBe(1);
+    expect(r.view(t).done).toEqual([]);
+  });
+});
+
+describe('⚡ no-stop start', () => {
+  const judged = (p: Profile, starts: number[], opts: { segments?: Segment[] } = {}) => {
+    const events: ChunkEvent[] = [];
+    const r = roundOf(p, { events, segments: opts.segments });
+    let t = 0;
+    for (const start of starts) t = typeCurrent(r, t, { start, gap: 150 });
+    return { r, t, handoffs: events.filter((e) => e.type === 'smooth').map((e) => (e as { handoff: boolean | null }).handoff) };
+  };
+
+  it('is null until the baseline exists', () => {
+    expect(judged(newProfile(), [200, 200]).handoffs).toEqual([null, null]);
+  });
+
+  it('1.4 x ms per key is a ⚡, 1.6 x is not; the first chunk of a segment is never judged', () => {
+    const p = withBaseline(newProfile());
+    const { r, handoffs } = judged(p, [210, 210, 240]);
+    expect(handoffs).toEqual([null, true, false]);
+    const s = r.finish()!;
+    expect(s).toMatchObject({ handoffs: 1, handoffJudged: 2 });
+    expect(p.handoff.chunks).toEqual([true, false]);
+    expect(p.handoff.flow).toEqual([]);
+  });
+
+  it('is not judged after a repair, after a pause, in the Keys warm-up, or on a missed or slow chunk', () => {
+    const p = withBaseline(newProfile());
+    const events: ChunkEvent[] = [];
+    const r = roundOf(p, { events });
+    let t = typeCurrent(r, 0, { start: 210 });
+    t = typeCurrent(r, t, { start: 210, wrong: true });
+    for (let i = 0; i < 3; i++) t = typeCurrent(r, t, { start: 210 });
+    t = typeCurrent(r, t, { start: 210 }); // first after the repair
+    t = typeCurrent(r, t, { start: 210 }); // judged again
+    r.pause(t);
+    r.resume(t + 5000);
+    t = typeCurrent(r, t + 5000, { start: 210 }); // first after the pause
+    t = typeCurrent(r, t, { start: 800 }); // slow
+    const main = events.filter((e) => e.type === 'smooth' || e.type === 'slow' || e.type === 'error') as { type: string; handoff: boolean | null }[];
+    expect(main.map((e) => [e.type, e.handoff])).toEqual([
+      ['smooth', null],
+      ['error', null],
+      ['smooth', null],
+      ['smooth', true],
+      ['smooth', null],
+      ['slow', null],
+    ]);
+    expect(judged(withBaseline(newProfile()), [210, 210], { segments: [{ kind: 'keys', ms: 60_000 }] }).handoffs).toEqual([null, null]);
+  });
+
+  it('keeps the last handoffWindow judgments per kind', () => {
+    const p = withBaseline(newProfile());
+    judged(p, Array(CONFIG.handoffWindow + 10).fill(210));
+    expect(p.handoff.chunks).toHaveLength(CONFIG.handoffWindow);
+  });
+});
+
+describe('next-chunk cue', () => {
+  const withRate = (rate: number, n = 100) => {
+    const p = newProfile();
+    p.handoff.chunks = Array.from({ length: n }, (_, i) => i < rate * n);
+    return p;
+  };
+
+  it('strong under 50% or with fewer than 30 judgments, soft under 70%, off above', () => {
+    const cueAfterFirstKey = (p: Profile) => {
+      const r = roundOf(p);
+      const v = r.view(0);
+      expect(r.view(0).cue).toBeNull();
+      r.key(v.text[0], 300);
+      return r.view(300).cue;
+    };
+    expect(cueAfterFirstKey(withRate(0.4))).toBe('strong');
+    expect(cueAfterFirstKey(withRate(0.6))).toBe('soft');
+    expect(cueAfterFirstKey(withRate(0.8))).toBeNull();
+    expect(cueAfterFirstKey(withRate(0.9, 29))).toBe('strong');
+  });
+
+  it('never shows in the Keys warm-up or a repair, and not when the chunk has a hunting letter', () => {
+    const keys = roundOf(newProfile(), { segments: [{ kind: 'keys', ms: 60_000 }] });
+    keys.key(keys.view(0).text[0], 300);
+    expect(keys.view(300).cue).toBeNull();
+
+    const r = roundOf(newProfile());
+    const t = typeCurrent(r, 0, { wrong: true });
+    r.key(r.view(t).text[0], t + 300);
+    expect(r.view(t + 300).repair).not.toBeNull();
+    expect(r.view(t + 300).cue).toBeNull();
+
+    const p = newProfile();
+    p.testPerKey = Array(10).fill(150);
+    for (const l of 'abcdefghijklmnopqrstuvwxyz') p.letters[l] = { pauses: Array(10).fill(900), knownStreak: 0 };
+    const h = roundOf(p);
+    h.key(h.view(0).text[0], 300);
+    expect(h.view(300).cue).toBeNull();
+  });
+
+  it('keeps its strength for the whole segment', () => {
+    const p = withRate(0.4);
+    const r = roundOf(p);
+    p.handoff.chunks = Array(100).fill(true);
+    const t = typeCurrent(r, 0);
+    r.key(r.view(t).text[0], t + 300);
+    expect(r.view(t + 300).cue).toBe('strong');
+  });
+});

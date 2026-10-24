@@ -9,10 +9,8 @@ import { COPY, fmtClock, unlockName } from './copy';
 import { GameIcon } from './GameParts';
 import { Keyboard } from './Keyboard';
 import { playSound } from './sounds';
+import { Tape } from './Tape';
 import { hasCommandModifier, isImeKey, useKeydown, useLeave } from './keys';
-
-const MARK = { smooth: '✓', slow: '◷', error: '✕' } as const;
-const MARK_CLASS = { smooth: 'good', slow: 'slow', error: 'bad' } as const;
 
 const bubbleText = (b: Bubble) =>
   b.kind === 'combo'
@@ -45,7 +43,7 @@ export function Practice({
         onEvent: (e) => scorer.onEvent(e),
       }),
   );
-  const [pop, setPop] = useState<{ text: string; until: number; id: number } | null>(null);
+  const [pop, setPop] = useState<{ text: string; until: number; id: number; chunkId: number } | null>(null);
   const [bubbles, setBubbles] = useState<{ text: string; level: boolean; from: number; until: number }[]>([]);
   const [keysToFind] = useState(() => keysLetters(profile));
   const [now, setNow] = useState(() => performance.now());
@@ -94,7 +92,8 @@ export function Practice({
     const f = scorer.take();
     const sounds = game.settings.sounds;
     if (f.xp > 0 && !f.fixed) {
-      setPop({ text: f.mastered ? COPY.game.popMastered(f.xp) : COPY.game.pop(f.xp), until: t + GAME_CONFIG.popMs, id: t });
+      const chunkId = round.results.at(-1)?.id ?? -1;
+      setPop({ text: f.mastered ? COPY.game.popMastered(f.xp) : COPY.game.pop(f.xp), until: t + GAME_CONFIG.popMs, id: t, chunkId });
     }
     if (sounds && f.fixed) playSound('fixed');
     if (sounds && f.mastered) playSound('mastered');
@@ -179,19 +178,15 @@ export function Practice({
     return (
       <span
         key={isErr ? `${i}-${err.tick}` : i}
-        className={`ch${i < v.pos ? ' done' : ''}${i === v.pos ? ' at' : ''}${isErr ? ' err' : ''}`}
+        className={`ch${ch === ' ' ? ' isp' : ''}${i < v.pos ? ' done' : ''}${i === v.pos ? ' at' : ''}${isErr ? ' err' : ''}`}
       >
         {ch === ' ' ? ' ' : ch}
       </span>
     );
   });
   const spaceAt = v.pos >= v.text.length;
-  const cur = (
-    <div className="cur" data-testid="current" data-text={v.text} data-pos={v.pos}>
-      {chars}
-      <span className={`sp${spaceAt ? ' at' : ''}${err && spaceAt ? ' err' : ''}`}>·</span>
-    </div>
-  );
+  // A space is blank; when it is the key to press, a small space-bar shape shows in the gap.
+  const spaceClass = `sp${spaceAt ? ' at' : ''}${err && spaceAt ? ' err' : ''}`;
 
   const prompt =
     v.chunkInSegment === 0 && !v.repair ? (v.mode === 'keys' ? COPY.practice.keysTip : COPY.practice.readIt) : '';
@@ -268,7 +263,12 @@ export function Practice({
             {v.repair ? (
               <div className="repair" data-testid="repair">
                 <h2>{COPY.practice.repairTitle}</h2>
-                <div className="strip">{cur}</div>
+                <div className="strip">
+                  <div className="cur" data-testid="current" data-text={v.text} data-pos={v.pos}>
+                    {chars}
+                    <span className={spaceClass}>{'\u00a0'}</span>
+                  </div>
+                </div>
                 <div className="dots">
                   {Array.from({ length: CONFIG.repairCleanNeeded }, (_, i) => <i key={i} className={i < v.repair!.clean ? 'on' : ''} />)}
                 </div>
@@ -277,22 +277,23 @@ export function Practice({
             ) : (
               <>
                 <div className="prompt">{firstChunk ? `${prompt} ${COPY.practice.fingers}` : prompt}</div>
-                <div className="strip">
-                  <div className="prev" data-testid="prev">
-                    {showPop && <span key={showPop.id} className="pop" data-testid="pop">{showPop.text}</span>}
-                    {v.prev && (
-                      <>
-                        <span>{v.prev.text}</span>
-                        <span className={`mk ${MARK_CLASS[v.prev.outcome]}`} aria-label={v.prev.outcome}>{MARK[v.prev.outcome]}</span>
-                      </>
-                    )}
-                  </div>
-                  {cur}
-                  <div className="next" data-testid="next">
-                    <span className={`n1${v.readAhead ? ' lit' : ''}`}>{v.next[0] ?? ''}</span>
-                    <span className="n2">{v.next[1] ?? ''}</span>
-                  </div>
-                </div>
+                <Tape
+                  key={`${v.segIndex}`}
+                  done={v.done}
+                  current={{
+                    id: v.id,
+                    spaceClass,
+                    node: (
+                      <span className="w cur" data-testid="current" data-text={v.text} data-pos={v.pos}>
+                        {chars}
+                      </span>
+                    ),
+                  }}
+                  next={v.next}
+                  cue={v.cue}
+                  keys={v.mode === 'keys'}
+                  pop={showPop}
+                />
               </>
             )}
           </>

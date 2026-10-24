@@ -72,3 +72,29 @@ export async function testStep(page: Page, i: number, missEvery = 0, gap = 150) 
   await page.keyboard.press(expected === ' ' ? 'Space' : expected);
   await page.clock.runFor(gap);
 }
+
+/** Change the stored profile (a profile must be stored already), then reload. */
+export async function editProfile(page: Page, fn: string) {
+  await page.evaluate(
+    (body) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('level-up-typer');
+        req.onsuccess = () => {
+          const tx = req.result.transaction('kv', 'readwrite');
+          const store = tx.objectStore('kv');
+          const get = store.get('profile-v1');
+          get.onsuccess = () => {
+            const p = get.result;
+            new Function('p', body)(p);
+            store.put(p, 'profile-v1');
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    fn,
+  );
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
+}

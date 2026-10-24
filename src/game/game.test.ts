@@ -28,10 +28,11 @@ import {
 type OutcomeType = 'smooth' | 'slow' | 'error';
 const ev = (
   type: OutcomeType,
-  o: { segment?: JudgeMode; start?: number | null; median?: number | null; text?: string } = {},
+  o: { segment?: JudgeMode; start?: number | null; median?: number | null; text?: string; handoff?: boolean | null } = {},
 ): ChunkEvent => {
   const start = o.start === undefined ? 400 : o.start;
   const medianStart = o.median === undefined ? null : o.median;
+  const quickStart = start === null || medianStart === null ? null : start < medianStart;
   return {
     type,
     text: o.text ?? 'the',
@@ -39,7 +40,9 @@ const ev = (
     segment: o.segment ?? 'chunks',
     start,
     medianStart,
-    quickStart: start === null || medianStart === null ? null : start < medianStart,
+    quickStart,
+    // Most tests only care that a start was quick; a quick start stands in for ⚡ unless given.
+    handoff: o.handoff === undefined ? quickStart : o.handoff,
   };
 };
 const fixed: ChunkEvent = { type: 'fixed', text: 'the', itemKey: null, segment: 'chunks' };
@@ -235,16 +238,24 @@ describe('Shield', () => {
 });
 
 describe('Spark and Flow Chain use the personal baseline only', () => {
-  it('Spark: +5 when the start is below the median, nothing before the baseline exists', () => {
+  it('Spark: +5 for each ⚡ (no-stop start), not for a quick start without ⚡', () => {
     const s = new RoundScorer(L(3));
-    s.onEvent(ev('smooth', { start: 300, median: null }));
+    s.onEvent(ev('smooth', { handoff: null }));
     expect(s.xp.quick).toBe(0);
-    s.onEvent(ev('smooth', { start: 300, median: 500 }));
+    s.onEvent(ev('smooth', { handoff: true }));
     expect(s.xp.quick).toBe(5);
-    s.onEvent(ev('smooth', { start: 500, median: 500 }));
+    s.onEvent(ev('smooth', { start: 300, median: 500, handoff: false }));
     expect(s.xp.quick).toBe(5);
-    s.onEvent(ev('smooth', { start: 100, median: 500, segment: 'keys' }));
+    s.onEvent(ev('smooth', { start: 300, median: 500, handoff: null }));
     expect(s.xp.quick).toBe(5);
+    s.onEvent(ev('smooth', { segment: 'keys', handoff: true }));
+    expect(s.xp.quick).toBe(5);
+  });
+
+  it('⚡ below level 3 earns nothing extra', () => {
+    const s = new RoundScorer(L(2) + 1);
+    s.onEvent(ev('smooth', { handoff: true }));
+    expect(s.xp.quick).toBe(0);
   });
 
   it('Spark is doubled by Combo', () => {

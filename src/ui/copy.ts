@@ -55,6 +55,7 @@ export const COPY = {
     hideKeyboard: 'Hide keyboard',
     showKeyboard: 'Show keyboard',
     hints: (mode: string) => `Hints: ${mode}`,
+    noStop: 'no stop',
   },
 
   summary: {
@@ -68,6 +69,7 @@ export const COPY = {
     nothingFixed: 'Nothing needed fixing.',
     keysLookedFor: 'Keys you looked for',
     noKeys: 'None. Great!',
+    handoffs: (n: number, m: number) => `⚡ No-stop starts: ${n} of ${m}`,
     done: 'Done',
     oneMore: 'One more round',
     keysHelp: 'Enter: Done · R: One more round',
@@ -179,7 +181,7 @@ export const COPY = {
       smooth: 'Smooth chunks',
       letters: 'Single letters',
       slowClean: 'Clean but slow',
-      quick: 'Quick starts (Spark)',
+      quick: 'No-stop starts ⚡ (Spark)',
       fixed: 'Fixed',
       fixedLetters: 'Fixed letters',
       mastered: 'Newly mastered',
@@ -240,7 +242,7 @@ export const COPY = {
     looksNote: 'Looks change the practice colours. The finger colours on the keyboard stay the same.',
     powerUps: {
       combo: { name: 'Combo', what: '10 clean chunks in a row: your points double until a wrong key.', trains: 'Trains: accuracy first' },
-      spark: { name: 'Spark', what: '+5 when you start a chunk faster than you usually do.', trains: 'Trains: start time (whole words)' },
+      spark: { name: 'Spark', what: '+5 for each ⚡: you start the next chunk with no stop.', trains: 'Trains: reading ahead' },
       keyFinder: { name: 'Key Finder', what: '+50 when a key you looked for becomes easy.', trains: 'Trains: keys without looking' },
       flowChain: { name: 'Flow Chain', what: 'In Flow, 5 in a row with no long stop: +10.', trains: 'Trains: word to word' },
       shield: { name: 'Shield', what: 'Once a round, a wrong key keeps your Combo. You still fix the chunk.', trains: 'Keeps a Combo safe' },
