@@ -1,10 +1,15 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
-/** Open the app with a fake clock so timing is deterministic and fast. */
-export async function open(page: Page, query = '') {
+/**
+ * Open the app with a fake clock so timing is deterministic and fast. The first-run cards are
+ * skipped unless `basics` is true.
+ */
+export async function open(page: Page, query = '', { basics = false } = {}) {
   await page.clock.install({ time: new Date('2026-10-19T10:00:00') });
-  await page.goto(`/${query}`);
+  const q = new URLSearchParams(query.replace(/^\?/, ''));
+  if (!basics) q.set('basics', 'skip');
+  await page.goto(`/?${q}`);
   await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
 }
 

@@ -12,11 +12,13 @@ import {
   compareTest,
   huntLetters,
   itemKey,
+  keyboardLevel,
   letterState,
   measureChunk,
   newProfile,
   planChallenge,
   planRound,
+  recordStars,
   saveTest,
   testScore,
   updateKnownStreaks,
@@ -955,5 +957,118 @@ describe('next-chunk cue', () => {
     const t = typeCurrent(r, 0);
     r.key(r.view(t).text[0], t + 300);
     expect(r.view(t + 300).cue).toBe('strong');
+  });
+});
+
+describe('the on-screen keyboard steps away', () => {
+  const withKnown = (n: number) => {
+    const p = newProfile();
+    p.testPerKey = Array(10).fill(200);
+    for (const l of 'abcdefghijklmnopqrstuvwxyz'.slice(0, n)) p.letters[l] = { pauses: Array(10).fill(100), knownStreak: 2 };
+    return p;
+  };
+  it('letters, then colours only at half the letters known, then tucked away at 75%', () => {
+    expect(keyboardLevel(withKnown(11))).toBe('labels'); // 0.42
+    expect(keyboardLevel(withKnown(16))).toBe('blank'); // 0.62
+    expect(keyboardLevel(withKnown(21))).toBe('tucked'); // 0.81
+  });
+});
+
+describe('catch the star (Keys warm-up)', () => {
+  const keysOnly: Segment[] = [{ kind: 'keys', ms: 120_000 }];
+  /** Keep typing (one correct key every 400 ms) and tick every 100 ms; calls `each` after every tick. */
+  const run = (r: Round, from: number, to: number, each?: (t: number) => boolean | void) => {
+    let t = from;
+    while (t < to) {
+      t += 100;
+      if (t % 400 === 0) r.key(r.view(t).expected, t);
+      r.tick(t);
+      if (each?.(t)) break;
+    }
+    return t;
+  };
+  const active = (r: Round, t: number) => r.view(t).activeMs;
+
+  it('the first star comes 8 s in, shows 1.6 s, and the next comes 15 to 30 s later', () => {
+    const events: ChunkEvent[] = [];
+    const r = roundOf(newProfile(), { segments: keysOnly, events });
+    const shows: { at: number; star: boolean }[] = [];
+    run(r, 0, 70_000, (t) => void shows.push({ at: active(r, t), star: !!r.view(t).star }));
+    const starts = shows.filter((s, i) => s.star && !shows[i - 1]?.star).map((s) => s.at);
+    const ends = shows.filter((s, i) => !s.star && shows[i - 1]?.star).map((s) => s.at);
+    expect(starts[0]).toBeGreaterThanOrEqual(CONFIG.starFirstMs);
+    expect(starts[0]).toBeLessThan(CONFIG.starFirstMs + 200);
+    expect(ends[0] - starts[0]).toBeGreaterThanOrEqual(CONFIG.starShowMs);
+    expect(ends[0] - starts[0]).toBeLessThan(CONFIG.starShowMs + 200);
+    expect(starts[1] - ends[0]).toBeGreaterThanOrEqual(CONFIG.starEveryMs[0]);
+    expect(starts[1] - ends[0]).toBeLessThanOrEqual(CONFIG.starEveryMs[1] + 200);
+    expect(events.filter((e) => e.type === 'star')).toEqual(ends.map(() => ({ type: 'star', caught: false })));
+  });
+
+  it('never shows outside the Keys warm-up', () => {
+    const r = roundOf(newProfile());
+    let seen = false;
+    run(r, 0, 60_000, (t) => void (seen ||= !!r.view(t).star));
+    expect(seen).toBe(false);
+  });
+
+  it('Enter catches a showing star; with no star it does nothing and is not a key', () => {
+    const events: ChunkEvent[] = [];
+    const r = roundOf(newProfile(), { segments: keysOnly, events });
+    const before = r.view(100);
+    expect(r.catchStar(100)).toBe(false);
+    expect(r.view(100).pos).toBe(before.pos);
+    expect(r.view(100).errorTick).toBe(before.errorTick);
+    const t = run(r, 100, 20_000, (t) => !!r.view(t).star);
+    expect(r.catchStar(t)).toBe(true);
+    expect(r.view(t).star).toBeNull();
+    expect(events.filter((e) => e.type === 'star')).toEqual([{ type: 'star', caught: true }]);
+    const s = r.finish()!;
+    expect(s).toMatchObject({ starsShown: 1, starsCaught: 1 });
+  });
+
+  it('no stars while paused', () => {
+    const r = roundOf(newProfile(), { segments: keysOnly });
+    const t = run(r, 0, 20_000, (t) => !!r.view(t).star);
+    r.pause(t);
+    expect(r.view(t).star).toBeNull();
+    expect(r.catchStar(t)).toBe(false);
+  });
+
+  it('after two stars in a row fly away, a reminder shows for 3 s', () => {
+    const r = roundOf(newProfile(), { segments: keysOnly });
+    let warnFrom: number | null = null;
+    let warnTo: number | null = null;
+    run(r, 0, 120_000, (t) => {
+      const w = r.view(t).starWarn;
+      if (w && warnFrom === null) warnFrom = active(r, t);
+      if (!w && warnFrom !== null && warnTo === null) warnTo = active(r, t);
+    });
+    expect(warnFrom).not.toBeNull();
+    expect(warnTo! - warnFrom!).toBeGreaterThanOrEqual(CONFIG.starWarnMs - 100);
+    expect(warnTo! - warnFrom!).toBeLessThan(CONFIG.starWarnMs + 200);
+  });
+
+  it('turns off after 3 rounds in a row with 3+ stars, each caught 90% or more', () => {
+    const p = newProfile();
+    expect(recordStars(p, 2, 2)).toBe(false); // too few stars: not counted
+    expect(recordStars(p, 5, 5)).toBe(false);
+    expect(recordStars(p, 10, 9)).toBe(false);
+    expect(recordStars(p, 4, 3)).toBe(false); // 75% breaks the run
+    expect(recordStars(p, 3, 3)).toBe(false);
+    expect(recordStars(p, 5, 5)).toBe(false);
+    expect(p.stars.off).toBe(false);
+    expect(recordStars(p, 10, 9)).toBe(true);
+    expect(p.stars.off).toBe(true);
+    const r = roundOf(p, { segments: keysOnly });
+    let seen = false;
+    run(r, 0, 30_000, (t) => void (seen ||= !!r.view(t).star));
+    expect(seen).toBe(false);
+  });
+});
+
+describe('first-run cards', () => {
+  it('a new profile has not seen them', () => {
+    expect(newProfile().seenBasics).toBe(false);
   });
 });

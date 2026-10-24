@@ -49,6 +49,12 @@ export const CONFIG = {
   hintDelayMs: { hunt: 0, learning: 1000, known: 3000 },
   /** The keyboard fades and shrinks when at least this share of letters is known. */
   keyboardQuietKnownShare: 0.75,
+  /** At this share of known letters the on-screen keys lose their letters (finger colours stay). */
+  keyboardBlankKnownShare: 0.5,
+  /** Tucked away: the keyboard pops up after this long on one key, or at once after a wrong key. */
+  keyboardPopUpMs: 2000,
+  /** How long the wrong key keeps its red frame. */
+  wrongKeyFlashMs: 700,
 
   // --- today's round ---
   roundMinutesOptions: [5, 7, 10] as const,
@@ -99,6 +105,20 @@ export const CONFIG = {
   /** ⚡ rate at which the next-chunk cue turns soft, and at which it turns off. */
   cueSoftAt: 0.5,
   cueOffAt: 0.7,
+
+  // --- catch the star (Keys warm-up only, a one-week trial) ---
+  /** The first star comes this long into the Keys warm-up (typing time). */
+  starFirstMs: 8000,
+  /** Then one every 15 to 30 s of typing time. */
+  starEveryMs: [15_000, 30_000] as const,
+  /** Each star shows this long. */
+  starShowMs: 1600,
+  /** Stars turn off after starOffRounds rounds in a row with at least starMinShown stars, all caught at starOffRate or more. */
+  starOffRounds: 3,
+  starOffRate: 0.9,
+  starMinShown: 3,
+  /** "Two stars flew away" shows this long (typing time). */
+  starWarnMs: 3000,
 
   // --- set challenge (M2b) ---
   /** A set challenge mixes one set's 10 items for this long. */

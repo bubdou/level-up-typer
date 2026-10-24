@@ -77,6 +77,7 @@ export function Home({ profile, go, update, game }: ScreenProps) {
             <button className="btn" onClick={() => go({ name: 'practice' })}>{COPY.home.start}</button>
             <span className="note">{COPY.home.orEnter}</span>
           </div>
+          <button className="linkbtn" onClick={() => go({ name: 'basics' })} data-testid="basics-link">{COPY.basics.link}</button>
           <button
             className="linkbtn"
             onClick={() => {

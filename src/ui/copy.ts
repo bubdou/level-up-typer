@@ -56,6 +56,47 @@ export const COPY = {
     showKeyboard: 'Show keyboard',
     hints: (mode: string) => `Hints: ${mode}`,
     noStop: 'no stop',
+    // eyes up: the on-screen keyboard steps away
+    fingers5: {
+      l5: 'Left pinky',
+      l4: 'Left ring finger',
+      l3: 'Left middle finger',
+      l2: 'Left index finger',
+      r2: 'Right index finger',
+      r3: 'Right middle finger',
+      r4: 'Right ring finger',
+      r5: 'Right pinky',
+    } as Record<string, string>,
+    onHome: "It's on its home key.",
+    thumb: 'Thumb on the space bar.',
+    pressedDir: (k: string, t: string, dir: string) => `You pressed ${k}. ${t} is ${dir}.`,
+    pressedFind: (k: string, t: string) => `You pressed ${k}. Find ${t}.`,
+    pressedNowSpace: (k: string) => `You pressed ${k}. Now press space.`,
+    pressedSpace: (t: string) => `You pressed space. Find ${t}.`,
+    tucked: 'Keyboard tucked away. It pops up if you get stuck.',
+    // catch the star (Keys warm-up)
+    starEnter: 'Enter',
+    starCaught: '★ +5',
+    starsFlew: 'Two stars flew away. Keep your eyes on the screen.',
+  },
+
+  basics: {
+    cards: [
+      { title: 'Sit like this', text: 'Sit up tall. Feet flat on the floor. The screen is in front of your eyes. Shoulders relaxed.' },
+      {
+        title: 'Fingers home',
+        text: 'Find the small bumps on F and J. Put your pointer fingers there. Rest the other fingers on A S D and K L ;. Thumbs rest on the space bar.',
+      },
+      {
+        title: 'Eyes up',
+        text: "Keep your eyes on the screen. Can't find a key? Look at the keyboard on the screen, not at your hands. Lost? Feel for the bumps on F and J. It's OK to be slow at first.",
+      },
+    ],
+    step: (n: number, of: number) => `${n} of ${of}`,
+    next: 'Next',
+    start: 'Start',
+    orEnter: 'or press Enter',
+    link: 'How to sit and place your fingers',
   },
 
   summary: {
@@ -70,6 +111,8 @@ export const COPY = {
     keysLookedFor: 'Keys you looked for',
     noKeys: 'None. Great!',
     handoffs: (n: number, m: number) => `⚡ No-stop starts: ${n} of ${m}`,
+    stars: (n: number, m: number) => `★ Stars caught: ${n} of ${m}`,
+    starsOff: 'Your eyes stay on the screen. Stars are off now.',
     done: 'Done',
     oneMore: 'One more round',
     keysHelp: 'Enter: Done · R: One more round',
@@ -189,6 +232,7 @@ export const COPY = {
       comboBonus: 'Combo bonus',
       keyFinder: 'Keys found',
       weekGoal: 'Week goal',
+      stars: 'Stars caught',
     } as Record<string, string>,
     times: (n: number, xp: number) => `${n} × ${xp}`,
     doubled: 'doubled points',

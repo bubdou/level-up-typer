@@ -9,12 +9,13 @@ import type { Cue, HandoffKind, Profile, RoundSummary } from './profile';
 import {
   addBaseline,
   addHandoff,
-  cueFor,
-  letterState,
   addLetterPause,
+  cueFor,
   huntLetters,
   itemRecord,
   keysLetters,
+  letterState,
+  recordStars,
   slowBaseline,
   updateKnownStreaks,
 } from './profile';
@@ -44,7 +45,9 @@ export type ChunkEvent =
       handoff: boolean | null;
     }
   | { type: 'fixed'; text: string; itemKey: string | null; segment: JudgeMode }
-  | { type: 'mastered'; text: string; itemKey: string };
+  | { type: 'mastered'; text: string; itemKey: string }
+  /** A star in the Keys warm-up was caught with Enter, or flew away. */
+  | { type: 'star'; caught: boolean };
 
 interface Entry {
   /** Stable for as long as the chunk is in the queue, so the strip can key on it. */
@@ -113,6 +116,10 @@ export interface RoundView {
   done: readonly ChunkResult[];
   /** How the chunk after this one lights up right now; null when it does not. */
   cue: Cue;
+  /** A star to catch with Enter (Keys warm-up only). `x` is its left edge as a share of the width. */
+  star: { id: number; x: number } | null;
+  /** Two stars in a row flew away: remind the learner to keep their eyes on the screen. */
+  starWarn: boolean;
   toast: { kind: 'fixed' | 'giveUp'; until: number } | null;
   paused: boolean;
   finished: boolean;
@@ -169,6 +176,14 @@ export class Round {
   private handoffPrimed = false;
   private handoffs = 0;
   private handoffJudged = 0;
+
+  // Catch the star. All times are typing time (activeMs), so pauses, segment names and a lost focus stop them.
+  private starNextAt: number | null = null;
+  private star: { id: number; x: number; until: number } | null = null;
+  private starsShown = 0;
+  private starsCaught = 0;
+  private starMisses = 0;
+  private starWarnUntil = 0;
   private chunkInSegment = 0;
 
   private pos = 0;
@@ -240,6 +255,8 @@ export class Round {
         this.pos > 0 && !this.repair && !this.paused && !this.finished && now >= this.interstitialUntil && !this.curHasHunt
           ? this.segCue
           : null,
+      star: this.star && !this.paused && now >= this.interstitialUntil ? { id: this.star.id, x: this.star.x } : null,
+      starWarn: this.activeMs < this.starWarnUntil,
       toast: this.toast && now < this.toast.until ? this.toast : null,
       paused: this.paused,
       finished: this.finished,
@@ -279,6 +296,43 @@ export class Round {
     if (now < this.interstitialUntil) return;
     const from = Math.max(now - dt, this.interstitialUntil);
     if (now - this.lastKeyAt < CONFIG.awayMs) this.activeMs += now - from;
+    this.updateStars();
+  }
+
+  /** Enter: catch the star if one shows. Never counts as a key. */
+  catchStar(now: number): boolean {
+    if (this.finished || this.paused || now < this.interstitialUntil) return false;
+    this.tick(now);
+    if (!this.star) return false;
+    this.star = null;
+    this.starsShown++;
+    this.starsCaught++;
+    this.starMisses = 0;
+    this.emit({ type: 'star', caught: true });
+    this.scheduleStar();
+    return true;
+  }
+
+  private scheduleStar() {
+    const [lo, hi] = CONFIG.starEveryMs;
+    this.starNextAt = this.activeMs + lo + this.rng() * (hi - lo);
+  }
+
+  private updateStars() {
+    if (this.star && this.activeMs >= this.star.until) {
+      this.star = null;
+      this.starsShown++;
+      this.emit({ type: 'star', caught: false });
+      if (++this.starMisses >= 2) {
+        this.starWarnUntil = this.activeMs + CONFIG.starWarnMs;
+        this.starMisses = 0;
+      }
+      this.scheduleStar();
+    }
+    if (!this.star && this.starNextAt !== null && this.activeMs >= this.starNextAt) {
+      this.starNextAt = null;
+      this.star = { id: this.starsShown + 1, x: 0.08 + this.rng() * 0.7, until: this.activeMs + CONFIG.starShowMs };
+    }
   }
 
   pause(now: number) {
@@ -332,7 +386,10 @@ export class Round {
       repairs: this.repairs,
       handoffs: this.handoffs,
       handoffJudged: this.handoffJudged,
+      starsShown: this.starsShown,
+      starsCaught: this.starsCaught,
     };
+    if (this.starsShown > 0) this.summary.starsTurnedOff = recordStars(this.p, this.starsShown, this.starsCaught);
     if (!this.challenge) this.p.rounds.push(this.summary);
     return this.summary;
   }
@@ -389,6 +446,9 @@ export class Round {
     this.upcoming = [];
     this.configureGenerator(this.segments[i]);
     this.segCue = this.segMode === 'keys' ? null : cueFor(this.p, this.handoffKind(this.segMode));
+    // Stars only in the Keys warm-up. One still showing when the segment ends is not counted.
+    this.star = null;
+    this.starNextAt = this.segMode === 'keys' && !this.p.stars?.off ? this.activeMs + CONFIG.starFirstMs : null;
     const first = this.generate(new Set());
     if (first.sentence) {
       const [w, ...rest] = this.expandSentence(first);
