@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RoundView } from '../engine';
-import { CONFIG, Round, keysLetters, knownShare, letterState, planChallenge } from '../engine';
+import { CONFIG, Round, keyboardLevel, keysLetters, letterState, planChallenge } from '../engine';
 import type { Bubble, LookId } from '../game';
 import { GAME_CONFIG, RoundScorer, finishChallenge, finishRound, hasPowerUp } from '../game';
 import type { ChallengeSpec, ScreenProps } from './App';
@@ -8,6 +8,7 @@ import { roundMinutesOverride } from './params';
 import { COPY, fmtClock, unlockName } from './copy';
 import { GameIcon } from './GameParts';
 import { Keyboard } from './Keyboard';
+import { fingerLine, wrongLine } from './keyboardLayout';
 import { playSound } from './sounds';
 import { Tape } from './Tape';
 import { hasCommandModifier, isImeKey, useKeydown, useLeave } from './keys';
@@ -49,8 +50,8 @@ export function Practice({
   const [now, setNow] = useState(() => performance.now());
   const [ime, setIme] = useState(false);
   const [caps, setCaps] = useState(false);
-  const [litStamp, setLitStamp] = useState<number | null>(null);
-  const [errAt, setErrAt] = useState<{ tick: number; pos: number; seq: number } | null>(null);
+  const [errAt, setErrAt] = useState<{ tick: number; pos: number; seq: number; key: string; at: number } | null>(null);
+  const [starPop, setStarPop] = useState<{ x: number; until: number } | null>(null);
   const endedRef = useRef(false);
   const rerender = () => setNow(performance.now());
 
@@ -127,6 +128,19 @@ export function Practice({
       }
       return;
     }
+    if (e.key === 'Enter') {
+      // Enter only catches a star. It is never a typing key, so it never counts as wrong.
+      e.preventDefault();
+      const star = round.view(now).star;
+      if (round.catchStar(now)) {
+        scorer.take();
+        if (game.settings.sounds) playSound('fixed');
+        setStarPop({ x: star?.x ?? 0.5, until: now + GAME_CONFIG.popMs });
+        changed();
+      }
+      rerender();
+      return;
+    }
     if (e.key === ' ' || e.key === 'Backspace' || e.key === 'Tab' || e.key.length === 1) e.preventDefault();
     if (e.key.length !== 1) return;
     setIme(false);
@@ -139,7 +153,7 @@ export function Practice({
     }
     const before = round.view(now);
     const res = round.key(e.key, now);
-    if (res === 'wrong') setErrAt({ tick: before.errorTick + 1, pos: before.pos, seq: before.seq });
+    if (res === 'wrong') setErrAt({ tick: before.errorTick + 1, pos: before.pos, seq: before.seq, key: e.key.toLowerCase(), at: now });
     if (res === 'done') {
       changed();
       showFeedback(now);
@@ -158,20 +172,22 @@ export function Practice({
           ? CONFIG.hintDelayMs.learning
           : CONFIG.hintDelayMs[letterState(profile, v.expected)];
 
-  useEffect(() => {
-    if (hintDelay === null || hintDelay === 0 || v.paused || v.interstitial) return;
-    const wait = Math.max(0, hintDelay - (performance.now() - v.charSince));
-    const stamp = v.charSince;
-    const id = setTimeout(() => setLitStamp(stamp), wait);
-    return () => clearTimeout(id);
-  }, [hintDelay, v.charSince, v.paused, v.interstitial]);
-
-  const lit = v.interstitial || v.paused || hintDelay === null ? null : hintDelay === 0 || litStamp === v.charSince ? v.expected : null;
+  const err = errAt && errAt.pos === v.pos && errAt.seq === v.seq ? errAt : null;
+  const hidden = !!v.interstitial || v.paused;
+  // The keyboard steps away as letters become known; the Keys warm-up and "Always" keep it whole.
+  const kbLevel = v.mode === 'keys' || s.hints === 'always' ? 'labels' : keyboardLevel(profile);
+  const popped =
+    kbLevel === 'tucked' && s.hints !== 'off' && !hidden && (!!err || now - v.charSince >= CONFIG.keyboardPopUpMs);
+  // After a wrong key, or when the tucked keyboard pops up, the right key lights at once, whatever
+  // the delay: a popped keyboard with nothing lit would not help. Delayed hints follow the 200 ms redraw.
+  const lit =
+    hidden || hintDelay === null ? null : now - v.charSince >= hintDelay || err || popped ? v.expected : null;
+  const wrongKey = err && now - err.at < CONFIG.wrongKeyFlashMs ? err.key : null;
+  const kbLine = hidden ? '' : err ? wrongLine(err.key, v.expected) : lit ? fingerLine(lit) : '';
   const segLabel = (i: number) => {
     const seg = v.segments[i];
     return seg.kind === 'chosen' ? COPY.stages[seg.stage!] : seg.kind === 'set' ? COPY.game.challengeTitle(challenge?.label ?? '') : COPY.segments[seg.kind];
   };
-  const err = errAt && errAt.pos === v.pos && errAt.seq === v.seq ? errAt : null;
 
   const chars = [...v.text].map((ch, i) => {
     const isErr = err && i === v.pos;
@@ -260,6 +276,17 @@ export function Practice({
         ) : (
           <>
             {toast && <div className="toast" role="status">{toast}</div>}
+            {v.star && (
+              <div key={v.star.id} className="star" style={{ left: `${v.star.x * 100}%` }} data-testid="star">
+                ★<small>{COPY.practice.starEnter}</small>
+              </div>
+            )}
+            {starPop && now < starPop.until && (
+              <div className="star caught" style={{ left: `${starPop.x * 100}%` }} data-testid="star-caught">
+                {COPY.practice.starCaught}
+              </div>
+            )}
+            {v.starWarn && <div className="starwarn" role="status" data-testid="star-warn">{COPY.practice.starsFlew}</div>}
             {v.repair ? (
               <div className="repair" data-testid="repair">
                 <h2>{COPY.practice.repairTitle}</h2>
@@ -307,7 +334,10 @@ export function Practice({
       ) : (
         <Keyboard
           lit={lit}
-          quiet={knownShare(profile) >= CONFIG.keyboardQuietKnownShare}
+          level={kbLevel}
+          popped={popped}
+          wrong={wrongKey}
+          line={kbLine}
           hintLabel={COPY.practice.hints(COPY.settings.hintModes[s.hints])}
           onHide={() => { (document.activeElement as HTMLElement | null)?.blur(); update((p) => (p.settings.keyboardHidden = true)); }}
         />

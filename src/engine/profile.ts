@@ -51,6 +51,11 @@ export interface RoundSummary {
   /** No-stop starts (⚡) and how many chunks were judged for one. Missing on older rounds. */
   handoffs?: number;
   handoffJudged?: number;
+  /** Catch-the-star in the Keys warm-up. Missing on older rounds. */
+  starsShown?: number;
+  starsCaught?: number;
+  /** This round turned stars off for good. */
+  starsTurnedOff?: boolean;
 }
 
 export interface TestRecord {
@@ -92,6 +97,10 @@ export interface Profile {
   settings: Settings;
   /** Recent ⚡ judgments (true = no stop), kept apart for chunks and words, and for flow. */
   handoff: Record<HandoffKind, boolean[]>;
+  /** Catch-the-star: recent rounds with enough stars, and whether stars are off for good. */
+  stars: { off: boolean; rounds: { shown: number; caught: number }[] };
+  /** Saw the first-run cards (how to sit, home keys, eyes up). */
+  seenBasics: boolean;
 }
 
 /** Short chunks are easier to join than flow, so their ⚡ rates are kept apart. */
@@ -110,6 +119,8 @@ export function newProfile(now = new Date()): Profile {
     rounds: [],
     tests: [],
     handoff: { chunks: [], flow: [] },
+    stars: { off: false, rounds: [] },
+    seenBasics: false,
     settings: { roundMinutes: CONFIG.defaultRoundMinutes, hints: 'auto', choose: null, keyboardHidden: false },
   };
 }
@@ -209,4 +220,26 @@ export function cueFor(p: Profile, kind: HandoffKind): Cue {
   if (arr.length < CONFIG.handoffMinJudged) return 'strong';
   const rate = arr.filter(Boolean).length / arr.length;
   return rate < CONFIG.cueSoftAt ? 'strong' : rate < CONFIG.cueOffAt ? 'soft' : null;
+}
+
+export type KeyboardLevel = 'labels' | 'blank' | 'tucked';
+
+/**
+ * How much of the on-screen keyboard shows, by the share of known letters: letters on the keys,
+ * then colours only, then tucked away (it pops up when stuck).
+ */
+export function keyboardLevel(p: Profile): KeyboardLevel {
+  const share = knownShare(p);
+  return share >= CONFIG.keyboardQuietKnownShare ? 'tucked' : share >= CONFIG.keyboardBlankKnownShare ? 'blank' : 'labels';
+}
+
+/** Saves one round's stars and turns stars off after enough rounds caught at a high rate. Returns true when it turned them off. */
+export function recordStars(p: Profile, shown: number, caught: number): boolean {
+  const st = (p.stars ??= { off: false, rounds: [] });
+  if (st.off || shown < CONFIG.starMinShown) return false;
+  st.rounds.push({ shown, caught });
+  if (st.rounds.length > CONFIG.starOffRounds) st.rounds.splice(0, st.rounds.length - CONFIG.starOffRounds);
+  const allHigh = st.rounds.length >= CONFIG.starOffRounds && st.rounds.every((r) => r.caught / r.shown >= CONFIG.starOffRate);
+  if (allHigh) st.off = true;
+  return allHigh;
 }

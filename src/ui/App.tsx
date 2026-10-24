@@ -3,12 +3,14 @@ import type { Profile, RoundSummary, TestComparison, TestRecord } from '../engin
 import type { ChallengeResult, GameState, RoundPoints } from '../game';
 import { applyHeadStart, lookUnlocked, levelOf, newGameState, syncEverMastered } from '../game';
 import { flush, loadGame, loadProfile, requestPersistence, saveGame, saveProfile, saveSoon } from '../storage/store';
+import { Basics } from './Basics';
 import { ChallengeResultPage } from './ChallengeResult';
 import { CollectionPage } from './CollectionPage';
 import { COPY } from './copy';
 import { Home } from './Home';
 import { PowerUpsPage } from './PowerUpsPage';
 import { Practice } from './Practice';
+import { skipBasics } from './params';
 import { ProgressPage } from './ProgressPage';
 import { SettingsPage } from './SettingsPage';
 import { Summary } from './Summary';
@@ -18,6 +20,7 @@ import { TestScreen, TestStopped } from './TestScreen';
 export type Screen =
   | { name: 'home' }
   | { name: 'practice' }
+  | { name: 'basics' }
   | { name: 'summary'; summary: RoundSummary; points: RoundPoints | null }
   | { name: 'test'; minutes: number }
   | { name: 'testStopped'; minutes: number }
@@ -118,7 +121,7 @@ export function App() {
 
   const props: ScreenProps = { profile, go, changed, update, game, updateGame };
   const look = lookUnlocked(levelOf(game.xp), game.settings.look) ? game.settings.look : 'classic';
-  const inRound = screen.name === 'practice' || screen.name === 'test' || screen.name === 'challenge';
+  const inRound = screen.name === 'practice' || screen.name === 'basics' || screen.name === 'test' || screen.name === 'challenge';
 
   return (
     <div className="wrap">
@@ -136,7 +139,10 @@ export function App() {
       </header>
       <main>
         {screen.name === 'home' && <Home {...props} />}
-        {screen.name === 'practice' && <Practice {...props} look={look} />}
+        {/* The first practice starts with the basics cards, once. */}
+        {screen.name === 'practice' && !profile.seenBasics && !skipBasics() && <Basics {...props} then="practice" />}
+        {screen.name === 'practice' && (profile.seenBasics || skipBasics()) && <Practice {...props} look={look} />}
+        {screen.name === 'basics' && <Basics {...props} then="home" />}
         {screen.name === 'summary' && <Summary {...props} summary={screen.summary} points={screen.points} />}
         {screen.name === 'test' && <TestScreen {...props} minutes={screen.minutes} />}
         {screen.name === 'testStopped' && <TestStopped {...props} minutes={screen.minutes} />}
