@@ -324,22 +324,28 @@ describe('slow chunks', () => {
     expect(r.view(t).repair).toBeNull();
   });
 
-  it('sends a slow chunk on, not to repair, and brings it back later in the round', () => {
-    const p = withBaseline(newProfile(), 300, 150);
-    const r = roundOf(p);
-    let t = typeCurrent(r, 0, { start: 400 });
-    const target = r.view(t).text;
-    t = typeCurrent(r, t, { start: 460 });
-    expect(r.results.at(-1)?.outcome).toBe('slow');
-    expect(r.view(t).repair).toBeNull();
-    expect(r.view(t).text).not.toBe(target);
-    const seen: string[] = [];
-    for (let i = 0; i < 13; i++) {
-      seen.push(r.view(t).text);
-      t = typeCurrent(r, t, { start: 300 });
+  it('sends a slow chunk on, not to repair, and brings it back after the chunks already shown', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const p = withBaseline(newProfile(), 300, 150);
+      const r = roundOf(p, { seed });
+      let t = typeCurrent(r, 0, { start: 300 });
+      const target = r.view(t).text;
+      const before = r.view(t).next.map((n) => `${n.id}:${n.text}`);
+      t = typeCurrent(r, t, { start: 460 });
+      expect(r.results.at(-1)?.outcome, `seed ${seed}`).toBe('slow');
+      const v = r.view(t);
+      expect(v.repair).toBeNull();
+      // the strip only moves on by one: what was shown ahead stays, one new chunk at the end
+      const after = v.next.map((n) => `${n.id}:${n.text}`);
+      expect(`${v.id}:${v.text}`, `seed ${seed}`).toBe(before[0]);
+      expect(after.slice(0, -1), `seed ${seed}`).toEqual(before.slice(1));
+      const seen: string[] = [];
+      for (let i = 0; i < 16; i++) {
+        seen.push(r.view(t).text);
+        t = typeCurrent(r, t, { start: 300 });
+      }
+      expect(seen.slice(8).includes(target), `seed ${seed}`).toBe(true);
     }
-    expect(seen[4]).toBe(target);
-    expect(seen.filter((x) => x === target).length).toBeGreaterThanOrEqual(2);
   });
 
   it('judges slow ms per key too', () => {

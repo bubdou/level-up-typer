@@ -555,7 +555,8 @@ export class Round {
     // Slow but right: no repair bay (being sent back for typing it right feels unfair), it comes
     // back later in the round instead. A revisit that is slow again is not queued once more.
     if (outcome === 'slow') {
-      if (!entry.revisit) this.scheduleRevisits(entry, CONFIG.revisitAfterSlow);
+      // No repair screen covers the strip here, so the chunks already shown ahead must stay put.
+      if (!entry.revisit) this.scheduleRevisits(entry, CONFIG.revisitAfterSlow, CONFIG.aheadChunks);
       this.advance(now);
       return;
     }
@@ -644,16 +645,18 @@ export class Round {
    * Put the chunk back into the queue so that `gap` other chunks come before it.
    * Never inside a sentence, and never next to the same text.
    */
-  private scheduleRevisits(entry: Entry, gaps: readonly number[]) {
-    for (const gap of gaps) this.insertRevisit(this.tag({ text: entry.text, itemKey: entry.itemKey, mode: entry.mode, revisit: true }), gap);
+  /** `shown`: this many queued chunks are on screen already; nothing is inserted or replaced among them. */
+  private scheduleRevisits(entry: Entry, gaps: readonly number[], shown = 0) {
+    for (const gap of gaps) this.insertRevisit(this.tag({ text: entry.text, itemKey: entry.itemKey, mode: entry.mode, revisit: true }), Math.max(gap, shown), shown);
   }
 
   /** Insert a revisit at queue index `idx` (that many chunks come before it). */
-  private insertRevisit(revisit: Entry, idx: number) {
+  private insertRevisit(revisit: Entry, idx: number, shown = 0) {
     this.fill(idx + 2);
     while (idx < this.upcoming.length && this.upcoming[idx - 1]?.sentence && !this.upcoming[idx - 1].sentence!.last) idx++;
     this.upcoming.splice(idx, 0, revisit);
     for (const j of [idx - 1, idx + 1]) {
+      if (j < shown) continue;
       const nb = this.upcoming[j];
       if (!nb || nb.text !== revisit.text || nb.revisit || nb.sentence) continue;
       const exclude = new Set([revisit.text, this.upcoming[j - 1]?.text, this.upcoming[j + 1]?.text].filter((t): t is string => !!t));
