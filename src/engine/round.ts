@@ -65,8 +65,6 @@ type NewEntry = Omit<Entry, 'id'>;
 interface Repair {
   clean: number;
   tries: number;
-  /** Why the chunk came to the repair bay: a wrong key, or right keys with a long pause. */
-  why: 'error' | 'slow';
 }
 
 export interface ChunkResult {
@@ -608,10 +606,17 @@ export class Round {
     const quickStart = start === null || medianStart === null ? null : start < medianStart;
     this.emit({ type: outcome, text: entry.text, itemKey: entry.itemKey, segment: entry.mode, start, medianStart, quickStart, handoff });
 
-    if (outcome !== 'smooth') {
-      this.repair = { clean: 0, tries: 0, why: outcome };
+    if (outcome === 'error') {
+      this.repair = { clean: 0, tries: 0 };
       this.repairs++;
       this.resetChunk(now);
+      return;
+    }
+    // Slow but right: no repair bay (being sent back for typing it right feels unfair), it comes
+    // back later in the round instead. A revisit that is slow again is not queued once more.
+    if (outcome === 'slow') {
+      if (!entry.revisit) this.scheduleRevisits(entry, CONFIG.revisitAfterSlow);
+      this.advance(now);
       return;
     }
     this.advance(now, true);
