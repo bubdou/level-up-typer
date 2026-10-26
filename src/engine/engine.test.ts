@@ -161,7 +161,7 @@ describe('repair bay', () => {
     const r = roundOf(newProfile(), { events });
     const target = r.view(0).text;
     let t = typeCurrent(r, 0, { wrong: true });
-    expect(r.view(t).repair).toEqual({ clean: 0, tries: 0 });
+    expect(r.view(t).repair).toEqual({ clean: 0, tries: 0, why: 'error' });
     expect(r.view(t).text).toBe(target);
 
     t = typeCurrent(r, t);
@@ -323,7 +323,7 @@ describe('slow chunks', () => {
     expect(r.view(t).repair).toBeNull();
     t = typeCurrent(r, t, { start: 460 });
     expect(r.results.at(-1)?.outcome).toBe('slow');
-    expect(r.view(t).repair).not.toBeNull();
+    expect(r.view(t).repair?.why).toBe('slow');
   });
 
   it('judges slow ms per key too', () => {
