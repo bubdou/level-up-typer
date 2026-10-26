@@ -80,6 +80,7 @@ test('chunk strip, wrong keys, repair bay and Fixed!', async ({ page }) => {
 
   await expect(page.getByTestId('repair')).toBeVisible();
   await expect(page.getByText('Again! 3 clean in a row')).toBeVisible();
+  await expect(page.getByTestId('repair-why')).toHaveText('There was a wrong key.');
   await expect(cur).toHaveAttribute('data-text', text);
   await typeChunk(page);
   await typeChunk(page);

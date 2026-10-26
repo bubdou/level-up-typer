@@ -263,6 +263,7 @@ export function Practice({
             {v.repair ? (
               <div className="repair" data-testid="repair">
                 <h2>{COPY.practice.repairTitle}</h2>
+                <p className="repairwhy" data-testid="repair-why" data-why={v.repair.why}>{COPY.practice.repairWhy[v.repair.why]}</p>
                 <div className="strip">
                   <div className="cur" data-testid="current" data-text={v.text} data-pos={v.pos}>
                     {chars}

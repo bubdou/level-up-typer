@@ -46,6 +46,8 @@ export const COPY = {
     readIt: 'Read it, then type it in one go.',
     fingers: 'Pointer fingers on the bumps of F and J.',
     repairTitle: 'Again! 3 clean in a row',
+    // Why this chunk is back: a slow one had no wrong key, so say so, or it feels unfair.
+    repairWhy: { error: 'There was a wrong key.', slow: 'All keys right, but there was a pause.' },
     tryOf: (n: number, max: number) => `Try ${n} of ${max}`,
     fixed: 'Fixed!',
     giveUp: "We'll try this one again soon.",

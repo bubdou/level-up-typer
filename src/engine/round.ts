@@ -62,6 +62,8 @@ type NewEntry = Omit<Entry, 'id'>;
 interface Repair {
   clean: number;
   tries: number;
+  /** Why the chunk came to the repair bay: a wrong key, or right keys with a long pause. */
+  why: 'error' | 'slow';
 }
 
 export interface ChunkResult {
@@ -547,7 +549,7 @@ export class Round {
     this.emit({ type: outcome, text: entry.text, itemKey: entry.itemKey, segment: entry.mode, start, medianStart, quickStart, handoff });
 
     if (outcome !== 'smooth') {
-      this.repair = { clean: 0, tries: 0 };
+      this.repair = { clean: 0, tries: 0, why: outcome };
       this.repairs++;
       this.resetChunk(now);
       return;
