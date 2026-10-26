@@ -21,6 +21,8 @@ export const CONFIG = {
   revisitAfterFix: [4, 12] as const,
   /** A chunk that was not fixed in 6 tries comes back after this many other chunks. */
   revisitAfterGiveUp: 2,
+  /** A slow chunk (right keys, long pause) skips the repair bay and comes back after this many. */
+  revisitAfterSlow: [4, 12] as const,
 
   // --- mastery ---
   /** Smooth in this many different rounds, with no miss in between. */

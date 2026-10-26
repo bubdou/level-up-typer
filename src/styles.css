@@ -79,7 +79,6 @@ h2 { font-size: 20px; font-weight: 600; margin: 0; }
 .repair { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .repair h2 { color: var(--accent); }
 .repairwhy { margin: 0; font-size: 15px; color: var(--muted); }
-.repairwhy { margin: 0; font-size: 15px; color: var(--muted); }
 .dots { display: flex; gap: 10px; }
 .dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); display: block; }
 .dots i.on { background: var(--accent); }
