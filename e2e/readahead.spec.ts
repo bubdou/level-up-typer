@@ -2,18 +2,22 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { editProfile, open, testStep, typeChunk, wrongFor } from './helpers';
 
-/** Left edge of the current chunk, and the strip's box, in page pixels. */
+/** Boxes of the window, the current chunk and the chunks ahead, in page pixels. */
 async function geometry(page: Page) {
   return page.evaluate(() => {
-    const win = document.querySelector<HTMLElement>('[data-testid="tape"]')!.getBoundingClientRect();
-    const cur = document.querySelector<HTMLElement>('[data-testid="current"]')!.getBoundingClientRect();
-    const ahead = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="ahead"]')).map((e) => e.getBoundingClientRect());
-    return { winLeft: win.left, winWidth: win.width, curLeft: cur.left, curRight: cur.right, ahead: ahead.map((r) => ({ left: r.left, right: r.right })) };
+    const box = (e: Element) => {
+      const r = e.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    };
+    const win = box(document.querySelector('[data-testid="tape"]')!);
+    const cur = box(document.querySelector('[data-testid="current"]')!);
+    const ahead = Array.from(document.querySelectorAll('[data-testid="ahead"]')).map(box);
+    return { win, cur, ahead };
   });
 }
 
-/** Wait for the strip's slide (real time: CSS transitions do not follow the fake clock). */
-const slideDone = (page: Page) =>
+/** Wait for the line change (real time: CSS transitions do not follow the fake clock). */
+const moveDone = (page: Page) =>
   page.evaluate(() => Promise.all(document.querySelector('.tape')!.getAnimations().map((a) => a.finished)));
 
 async function startPractice(page: Page) {
@@ -22,64 +26,60 @@ async function startPractice(page: Page) {
   await expect(page.getByTestId('tape')).toBeVisible();
 }
 
-test('the current chunk sits at 22% of the strip and the strip slides there after each chunk', async ({ page }) => {
+const inside = (r: { left: number; right: number; top: number; bottom: number }, w: { left: number; right: number; top: number; bottom: number }) =>
+  r.left >= w.left - 1 && r.right <= w.right + 1 && r.top >= w.top - 1 && r.bottom <= w.bottom + 1;
+
+test('the text stays still along a line; at a new line it moves up, so the current line is on top', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await startPractice(page);
-  for (let i = 0; i < 3; i++) {
+  let lineChanges = 0;
+  for (let i = 0; i < 20 && lineChanges < 2; i++) {
+    const before = await geometry(page);
     await typeChunk(page);
-    await slideDone(page);
-    const g = await geometry(page);
-    expect(Math.abs(g.curLeft - g.winLeft - 0.22 * g.winWidth)).toBeLessThanOrEqual(2);
-  }
-
-  // Catch the slide halfway: the current chunk is between where it was and where it ends up.
-  const text = (await page.getByTestId('current').getAttribute('data-text'))!;
-  for (const ch of text) await page.keyboard.press(ch);
-  const before = (await geometry(page)).ahead[0].left;
-  await page.keyboard.press('Space');
-  const mid = await page.evaluate(() => {
-    const anims = document.querySelector('.tape')!.getAnimations();
-    for (const a of anims) {
-      a.pause();
-      a.currentTime = 90;
+    await moveDone(page);
+    const after = await geometry(page);
+    // the current line stays on top the whole time
+    expect(Math.abs(after.cur.top - before.cur.top)).toBeLessThanOrEqual(1);
+    if (after.cur.left > before.cur.left) {
+      // same line: nothing moved, the current chunk is simply the next one along
+      expect(Math.abs(after.cur.left - before.ahead[0].left)).toBeLessThanOrEqual(1);
+      expect(Math.abs(after.cur.top - before.ahead[0].top)).toBeLessThanOrEqual(1);
+    } else {
+      // the chunk that was first on the line below is now the current one
+      expect(before.ahead[0].top - before.cur.top).toBeGreaterThan(10);
+      lineChanges++;
+      // new line: the current chunk is on the first line, at its left edge
+      expect(after.cur.left - after.win.left).toBeLessThanOrEqual(2);
     }
-    return { running: anims.length, left: document.querySelector('[data-testid="current"]')!.getBoundingClientRect().left };
-  });
-  const g = await geometry(page);
-  const target = g.winLeft + 0.22 * g.winWidth;
-  expect(mid.running).toBeGreaterThan(0);
-  expect(mid.left).toBeLessThan(before - 1);
-  expect(mid.left).toBeGreaterThan(target + 1);
+    expect(after.cur.top - after.win.top).toBeLessThan((after.win.bottom - after.win.top) / 2);
+  }
+  expect(lineChanges).toBe(2);
 });
 
-test('with reduced motion the strip moves at once', async ({ page }) => {
+test('with reduced motion the text moves up at once', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await startPractice(page);
-  await typeChunk(page);
-  const anims = await page.evaluate(() => document.querySelector('.tape')!.getAnimations().length);
-  expect(anims).toBe(0);
-  const g = await geometry(page);
-  expect(Math.abs(g.curLeft - g.winLeft - 0.22 * g.winWidth)).toBeLessThanOrEqual(2);
+  for (let i = 0; i < 15; i++) {
+    await typeChunk(page);
+    const anims = await page.evaluate(() => document.querySelector('.tape')!.getAnimations().length);
+    expect(anims).toBe(0);
+    const g = await geometry(page);
+    expect(g.cur.top - g.win.top).toBeLessThan((g.win.bottom - g.win.top) / 2);
+  }
 });
 
-test('1024x768 shows several whole chunks ahead before the fade; 400px has no sideways scroll', async ({ page }) => {
+test('1024x768 shows several whole chunks ahead; 400px has no sideways scroll', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await startPractice(page);
   let g = await geometry(page);
-  const clear = (x: typeof g) => x.ahead.filter((r) => r.left >= x.curRight && r.right <= x.winLeft + 0.82 * x.winWidth).length;
-  // Letter pairs and short words: at least 4 whole ones before the 82% line.
-  expect(clear(g)).toBeGreaterThanOrEqual(4);
+  const clear = (x: typeof g) => x.ahead.filter((r) => inside(r, x.win)).length;
+  // Letter pairs and short words: at least 6 whole ones in view.
+  expect(clear(g)).toBeGreaterThanOrEqual(6);
 
   await page.setViewportSize({ width: 400, height: 760 });
-  // The strip re-places itself when its own size changes, which can land a frame after the resize.
-  await expect
-    .poll(async () => {
-      const x = await geometry(page);
-      return Math.abs(x.curLeft - x.winLeft - 0.22 * x.winWidth);
-    })
-    .toBeLessThanOrEqual(2);
+  await expect.poll(async () => clear(await geometry(page))).toBeGreaterThanOrEqual(3);
   g = await geometry(page);
-  expect(clear(g)).toBeGreaterThanOrEqual(1);
+  expect(inside(g.cur, g.win)).toBe(true);
   const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
 });
