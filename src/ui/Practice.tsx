@@ -55,7 +55,8 @@ export function Practice({
   const endedRef = useRef(false);
   const rerender = () => setNow(performance.now());
 
-  const end = () => {
+  /** `toHome`: the Home button. The round is saved as usual, then Home instead of the summary. */
+  const end = (toHome = false) => {
     if (endedRef.current) return;
     endedRef.current = true;
     const timeUp = round.view(performance.now()).activeMs >= round.limitMs;
@@ -65,11 +66,11 @@ export function Practice({
       if (!summary) return go({ name: 'collection' });
       const result = finishChallenge(game, challenge.set, summary, scorer, timeUp);
       updateGame(() => {});
-      return go({ name: 'challengeResult', challenge, summary, result });
+      return go(toHome ? { name: 'home' } : { name: 'challengeResult', challenge, summary, result });
     }
     const points = summary ? finishRound(game, profile, summary, scorer, Date.now()) : null;
     if (points) updateGame(() => {});
-    go(summary ? { name: 'summary', summary, points } : { name: 'home' });
+    go(summary && !toHome ? { name: 'summary', summary, points } : { name: 'home' });
   };
 
   useEffect(() => {
@@ -225,6 +226,10 @@ export function Practice({
         </span>
         <div className="bar"><i style={{ width: `${Math.min(100, (v.activeMs / v.limitMs) * 100)}%` }} /></div>
         <span>{fmtClock(Math.max(0, v.limitMs - v.activeMs))}</span>
+        <span className="eschint">{COPY.practice.escHint}</span>
+        <button className="linkbtn quit" data-testid="quit" title={COPY.practice.quitTitle} onClick={() => end(true)}>
+          {COPY.nav.home}
+        </button>
       </div>
 
       <div className="gamebar" data-testid="gamebar">

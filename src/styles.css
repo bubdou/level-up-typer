@@ -156,6 +156,9 @@ select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid
 .toggle button { font: inherit; font-size: 13px; border: 0; background: var(--surface); color: var(--muted); padding: 4px 14px; cursor: pointer; }
 .toggle button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
 .headline { font-size: 20px; font-weight: 600; }
+.topbar .quit { align-self: center; white-space: nowrap; }
+.topbar .eschint { font-size: 12px; white-space: nowrap; }
+@media (max-width: 520px) { .topbar .eschint { display: none; } }
 .topbar .mode { color: var(--muted); } .topbar .mode b { color: var(--accent); font-weight: 600; }
 @media (max-width: 700px) {
   .homegrid { grid-template-columns: minmax(0, 1fr); } .big2 b { font-size: 40px; } .testtext { font-size: 18px; }

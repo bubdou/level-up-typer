@@ -53,6 +53,8 @@ export const COPY = {
     giveUp: "We'll try this one again soon.",
     paused: 'Paused. Press Space to go on.',
     pausedStop: 'Press Esc again to stop.',
+    escHint: 'Esc: pause',
+    quitTitle: 'Stop and go home. What you did so far is saved.',
     keyboardNote: 'Colors show which finger. Bumps on F and J.',
     hideKeyboard: 'Hide keyboard',
     showKeyboard: 'Show keyboard',
@@ -281,7 +283,7 @@ export const COPY = {
     paceNote: (wpm: number) => `The gold mark moves at ${wpm} wpm, the average of your last 3 tests.`,
     // power-ups
     powerUpsTitle: 'Power-ups',
-    powerUpsLead: 'Power-ups give points or looks. None of them skip a fix.',
+    powerUpsLead: 'Nothing to click here. Each power-up turns on by itself when you reach its level, and works while you practice. None of them skip a fix.',
     atLevel: (n: number) => `Level ${n}`,
     unlocked: 'Unlocked',
     looksTitle: 'Looks',

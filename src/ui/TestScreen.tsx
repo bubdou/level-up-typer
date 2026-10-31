@@ -89,6 +89,16 @@ export function TestScreen({ profile, go, changed, game, minutes }: ScreenProps 
         <span className="mode">{COPY.test.title(minutes)}</span>
         <div className="bar"><i style={{ width: `${100 - (run.remainingMs(now) / run.durationMs) * 100}%` }} /></div>
         <span className="clock" data-testid="clock">{fmtClock(run.remainingMs(now))}</span>
+        <button
+          className="linkbtn quit"
+          data-testid="quit"
+          onClick={() => {
+            doneRef.current = true;
+            go({ name: 'home' });
+          }}
+        >
+          {COPY.nav.home}
+        </button>
       </div>
       {ime && <div className="banner big" role="alert">{COPY.warn.ime}</div>}
       {caps && !ime && <div className="banner" role="alert">{COPY.warn.caps}</div>}
