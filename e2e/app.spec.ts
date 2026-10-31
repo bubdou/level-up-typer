@@ -92,6 +92,20 @@ test('chunk strip, wrong keys, repair bay and Fixed!', async ({ page }) => {
   await expect(page.getByTestId('done-chunk').last().locator('.mk')).toHaveText('✕');
   await page.clock.runFor(1000);
   await expect(page.getByText('Fixed!')).toHaveCount(0);
+
+  // the hands go on with the repaired chunk by habit: no red, no new repair, a note says where to type
+  await expect(page.getByText('Back to the line. Type the underlined one.')).toBeVisible();
+  const next = (await cur.getAttribute('data-text'))!;
+  for (const ch of text) {
+    if (ch === next[0]) break;
+    await page.keyboard.press(ch);
+    await expect(cur).toHaveAttribute('data-pos', '0');
+    await expect(cur.locator('.ch.err')).toHaveCount(0);
+  }
+  await typeChunk(page);
+  await expect(page.getByTestId('repair')).toHaveCount(0);
+  await expect(page.getByTestId('done-chunk').last()).toHaveAttribute('data-text', next);
+  await expect(page.getByTestId('done-chunk').last().locator('.mk')).not.toContainText('✕');
 });
 
 test('Esc and leaving the window pause practice; Space goes on', async ({ page }) => {

@@ -189,6 +189,43 @@ describe('repair bay', () => {
     expect(r.view(t).toast?.kind).toBe('giveUp');
   });
 
+  it('after the repair bay, typing the repaired chunk again by habit does not count as a miss', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const r = roundOf(newProfile(), { seed });
+      const target = r.view(0).text;
+      let t = typeCurrent(r, 0, { wrong: true });
+      for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+      const v = r.view(t);
+      expect(v.repair).toBeNull();
+      expect(v.backFromRepair).toBe(true);
+      const next = v.text;
+      // the hands go on: the repaired chunk once more, and its first letter again
+      for (const ch of `${target} ${target[0]}`) {
+        t += 150;
+        const res = r.key(ch, t);
+        expect(['echo', 'correct'], `seed ${seed}`).toContain(res);
+        if (res === 'correct') break;
+      }
+      // then the real chunk: it counts as clean, no new repair
+      t = typeCurrent(r, t);
+      expect(r.results.at(-1)?.text, `seed ${seed}`).toBe(next);
+      expect(r.results.at(-1)?.outcome, `seed ${seed}`).not.toBe('error');
+      expect(r.view(t).repair, `seed ${seed}`).toBeNull();
+      expect(r.view(t).backFromRepair).toBe(false);
+    }
+  });
+
+  it('after the repair bay, any other wrong key still counts, and ends the grace', () => {
+    const r = roundOf(newProfile(), { seed: 3 });
+    const target = r.view(0).text;
+    let t = typeCurrent(r, 0, { wrong: true });
+    for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+    const next = r.view(t).text;
+    const odd = [...'zxqjkv'].find((c) => !target.includes(c) && c !== next[0])!;
+    expect(r.key(odd, (t += 150))).toBe('wrong');
+    if (target[0] !== next[0]) expect(r.key(target[0], (t += 150))).toBe('wrong');
+  });
+
   it('does not judge slowness in repair', () => {
     const r = roundOf(withBaseline(newProfile()));
     let t = typeCurrent(r, 0, { wrong: true });
