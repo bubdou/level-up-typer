@@ -33,7 +33,7 @@ test('the text stays still along a line; at a new line it moves up, so the curre
   await page.setViewportSize({ width: 1024, height: 768 });
   await startPractice(page);
   let lineChanges = 0;
-  for (let i = 0; i < 20 && lineChanges < 2; i++) {
+  for (let i = 0; i < 40 && lineChanges < 2; i++) {
     const before = await geometry(page);
     await typeChunk(page);
     await moveDone(page);

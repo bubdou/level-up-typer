@@ -51,6 +51,7 @@ export const COPY = {
     tryOf: (n: number, max: number) => `Try ${n} of ${max}`,
     fixed: 'Fixed!',
     giveUp: "We'll try this one again soon.",
+    backFromRepair: 'Back to the line. Type the underlined one.',
     paused: 'Paused. Press Space to go on.',
     pausedStop: 'Press Esc again to stop.',
     keyboardNote: 'Colors show which finger. Bumps on F and J.',

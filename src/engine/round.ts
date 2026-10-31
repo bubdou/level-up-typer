@@ -114,6 +114,8 @@ export interface RoundView {
   /** How the chunk after this one lights up right now; null when it does not. */
   cue: Cue;
   toast: { kind: 'fixed' | 'giveUp'; until: number } | null;
+  /** Just back from the repair bay, nothing typed yet on this chunk: the screen says so. */
+  backFromRepair: boolean;
   paused: boolean;
   finished: boolean;
   activeMs: number;
@@ -124,7 +126,8 @@ export interface RoundView {
   seq: number;
 }
 
-export type KeyResult = 'ignored' | 'correct' | 'wrong' | 'done';
+/** `echo`: a key of the chunk just repaired, typed again by habit; it is not counted (see Round.echo). */
+export type KeyResult = 'ignored' | 'correct' | 'wrong' | 'done' | 'echo';
 
 /** Set challenge ids start with this, so mastery can tell them from normal rounds. */
 export const CHALLENGE_ID_PREFIX = 'ch-';
@@ -180,6 +183,13 @@ export class Round {
   private seq = 0;
   private repair: Repair | null = null;
   private toast: RoundView['toast'] = null;
+  /**
+   * After the repair bay the hands often go on typing the repaired chunk (it was typed 3 times in a
+   * row). Until the first right key of the next chunk, keys that spell the repaired chunk again,
+   * space included, are let through without counting as wrong, so one habit does not start a new
+   * repair. Any other wrong key counts as usual.
+   */
+  private echo: { text: string; i: number } | null = null;
 
   /** Count of main (non-repair) chunks finished this round; the n-th chunk has index n. */
   private mainCount = 0;
@@ -241,6 +251,7 @@ export class Round {
           ? this.segCue
           : null,
       toast: this.toast && now < this.toast.until ? this.toast : null,
+      backFromRepair: this.echo !== null && this.pos === 0 && !this.repair,
       paused: this.paused,
       finished: this.finished,
       activeMs: this.activeMs,
@@ -258,6 +269,15 @@ export class Round {
     const text = this.text();
     const expected = this.pos < text.length ? text[this.pos] : ' ';
     const correct = k === expected;
+    if (this.echo && !correct && this.pos === 0 && !this.repair && k === this.echo.text[this.echo.i % this.echo.text.length]) {
+      this.echo.i++;
+      // The wait for this chunk starts after the last echo key, so it is not judged slow for it.
+      this.shownAt = now;
+      this.charSince = now;
+      this.lastKeyAt = now;
+      return 'echo';
+    }
+    this.echo = null;
     this.strokes.push({ index: this.pos, key: k, t: now, correct });
     this.lastKeyAt = now;
     if (!correct) {
@@ -285,6 +305,7 @@ export class Round {
     if (this.finished || this.paused) return;
     this.tick(now);
     this.paused = true;
+    this.echo = null;
   }
 
   /** Resume restarts the current chunk so its timing has no pause in it. A miss before the pause still counts. */
@@ -379,6 +400,7 @@ export class Round {
   }
 
   private startSegment(i: number, now: number, withBreak: boolean) {
+    this.echo = null;
     // Revisits already scheduled keep their place when the segment changes.
     const carried = this.upcoming.map((e, idx) => ({ e, idx })).filter((x) => x.e.revisit);
     this.segIndex = i;
@@ -630,13 +652,17 @@ export class Round {
       this.repair = null;
       this.toast = { kind: 'fixed', until: now + CONFIG.fixedToastMs };
       this.scheduleRevisits(entry, CONFIG.revisitAfterFix);
-      return this.advance(now);
+      this.advance(now);
+      this.echo = { text: `${entry.text} `, i: 0 };
+      return;
     }
     if (r.tries >= CONFIG.repairMaxTries) {
       this.repair = null;
       this.toast = { kind: 'giveUp', until: now + CONFIG.giveUpToastMs };
       this.scheduleRevisits(entry, [CONFIG.revisitAfterGiveUp]);
-      return this.advance(now);
+      this.advance(now);
+      this.echo = { text: `${entry.text} `, i: 0 };
+      return;
     }
     this.resetChunk(now);
   }

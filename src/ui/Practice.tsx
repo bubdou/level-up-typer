@@ -188,8 +188,13 @@ export function Practice({
   // A space is blank; when it is the key to press, a small space-bar shape shows in the gap.
   const spaceClass = `sp${spaceAt ? ' at' : ''}${err && spaceAt ? ' err' : ''}`;
 
-  const prompt =
-    v.chunkInSegment === 0 && !v.repair ? (v.mode === 'keys' ? COPY.practice.keysTip : COPY.practice.readIt) : '';
+  const prompt = v.backFromRepair
+    ? COPY.practice.backFromRepair
+    : v.chunkInSegment === 0 && !v.repair
+      ? v.mode === 'keys'
+        ? COPY.practice.keysTip
+        : COPY.practice.readIt
+      : '';
   const toast = v.toast ? (v.toast.kind === 'fixed' ? COPY.game.fixedPoints(scorer.lastFixedXp) : COPY.practice.giveUp) : null;
   const level = scorer.level;
   const showPop = pop && now < pop.until ? pop : null;
