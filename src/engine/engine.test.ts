@@ -190,7 +190,8 @@ describe('repair bay', () => {
   });
 
   it('after the repair bay, typing the repaired chunk again by habit does not count as a miss', () => {
-    for (let seed = 1; seed <= 20; seed++) {
+    let overlaps = 0;
+    for (let seed = 1; seed <= 400; seed++) {
       const r = roundOf(newProfile(), { seed });
       const target = r.view(0).text;
       let t = typeCurrent(r, 0, { wrong: true });
@@ -199,19 +200,43 @@ describe('repair bay', () => {
       expect(v.repair).toBeNull();
       expect(v.backFromRepair).toBe(true);
       const next = v.text;
-      // the hands go on: the repaired chunk once more, and its first letter again
-      for (const ch of `${target} ${target[0]}`) {
+      // the hands go on: the whole repaired chunk once more, with its space, even where its letters
+      // are also right for the next chunk ("it" then "is", "at" then "to")
+      if ([...target].some((c) => c === next[0])) overlaps++;
+      let finished = false;
+      for (const ch of `${target} `) {
         t += 150;
         const res = r.key(ch, t);
-        expect(['echo', 'correct'], `seed ${seed}`).toContain(res);
-        if (res === 'correct') break;
+        // "the" then "he": the retype's tail is the next chunk itself, so it is simply typed
+        if (res === 'done') finished = true;
+        else expect(['echo', 'correct'], `seed ${seed}`).toContain(res);
       }
-      // then the real chunk: it counts as clean, no new repair
-      t = typeCurrent(r, t);
+      if (!finished) {
+        expect(r.view(t).pos, `seed ${seed}`).toBe(0);
+        // then the real chunk: it counts as clean, no new repair
+        t = typeCurrent(r, t);
+      }
       expect(r.results.at(-1)?.text, `seed ${seed}`).toBe(next);
       expect(r.results.at(-1)?.outcome, `seed ${seed}`).not.toBe('error');
       expect(r.view(t).repair, `seed ${seed}`).toBeNull();
       expect(r.view(t).backFromRepair).toBe(false);
+    }
+    // the seeds include chunks that share letters with the repaired one
+    expect(overlaps).toBeGreaterThan(20);
+  });
+
+  it('after the repair bay, a key that fits both readings counts for the next chunk if the rest does', () => {
+    for (let seed = 1; seed <= 400; seed++) {
+      const r = roundOf(newProfile(), { seed });
+      const target = r.view(0).text;
+      let t = typeCurrent(r, 0, { wrong: true });
+      for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+      const next = r.view(t).text;
+      if (next[0] !== target[0]) continue;
+      // the first key fits both; then the next chunk goes on, so that key was for it all along
+      t = typeCurrent(r, t);
+      expect(r.results.at(-1)?.text, `seed ${seed}`).toBe(next);
+      expect(r.results.at(-1)?.outcome, `seed ${seed}`).not.toBe('error');
     }
   });
 

@@ -200,9 +200,10 @@ export class Round {
   private toast: RoundView['toast'] = null;
   /**
    * After the repair bay the hands often go on typing the repaired chunk (it was typed 3 times in a
-   * row). Until the first right key of the next chunk, keys that spell the repaired chunk again,
-   * space included, are let through without counting as wrong, so one habit does not start a new
-   * repair. Any other wrong key counts as usual.
+   * row). While every key so far also spells the repaired chunk again (space included), the retype
+   * stays possible: a key that is right for the next chunk counts for it, but a key that fits only
+   * the retype drops those keys and restarts the next chunk, without a miss. A key that fits only
+   * the next chunk ends the grace; a key that fits neither is a miss as usual.
    */
   private echo: { text: string; i: number } | null = null;
 
@@ -286,15 +287,21 @@ export class Round {
     const text = this.text();
     const expected = this.pos < text.length ? text[this.pos] : ' ';
     const correct = k === expected;
-    if (this.echo && !correct && this.pos === 0 && !this.repair && k === this.echo.text[this.echo.i % this.echo.text.length]) {
-      this.echo.i++;
-      // The wait for this chunk starts after the last echo key, so it is not judged slow for it.
+    const fitsEcho = !!this.echo && !this.repair && k === this.echo.text[this.echo.i % this.echo.text.length];
+    if (fitsEcho && !correct) {
+      // Only the retype fits: this was the old chunk all along. Any keys taken for this chunk (they
+      // fitted both) are dropped, and the chunk starts over; its wait starts after this key, so it
+      // is not judged slow for the retype.
+      this.echo!.i++;
+      if (this.pos > 0) this.resetChunk(now);
       this.shownAt = now;
       this.charSince = now;
       this.lastKeyAt = now;
       return 'echo';
     }
-    this.echo = null;
+    // A key that fits both readings counts for this chunk, and the retype stays possible.
+    if (fitsEcho) this.echo!.i++;
+    else this.echo = null;
     this.strokes.push({ index: this.pos, key: k, t: now, correct });
     this.lastKeyAt = now;
     if (!correct) {
@@ -304,6 +311,7 @@ export class Round {
     this.pos++;
     this.charSince = now;
     if (this.pos <= text.length) return 'correct';
+    this.echo = null;
     this.complete(now);
     return 'done';
   }
