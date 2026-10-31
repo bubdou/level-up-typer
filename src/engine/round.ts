@@ -5,9 +5,12 @@ import type { Rng } from './picker';
 import { eligibleFlowItems, keysItems, pickItem, pickOne, practicedWords, trackPool, weakItems } from './picker';
 import type { Segment, SegmentKind } from './plan';
 import { planRound } from './plan';
-import type { Profile, RoundSummary } from './profile';
+import type { Cue, HandoffKind, Profile, RoundSummary } from './profile';
 import {
   addBaseline,
+  addHandoff,
+  cueFor,
+  letterState,
   addLetterPause,
   huntLetters,
   itemRecord,
@@ -37,11 +40,15 @@ export type ChunkEvent =
       medianStart: number | null;
       /** Start below the personal median. Null when either number is missing. */
       quickStart: boolean | null;
+      /** No-stop start (⚡): see Round.handoffFor. Null when the chunk was not judged. */
+      handoff: boolean | null;
     }
   | { type: 'fixed'; text: string; itemKey: string | null; segment: JudgeMode }
   | { type: 'mastered'; text: string; itemKey: string };
 
 interface Entry {
+  /** Stable for as long as the chunk is in the queue, so the strip can key on it. */
+  id: number;
   text: string;
   itemKey: string | null;
   mode: JudgeMode;
@@ -50,17 +57,21 @@ interface Entry {
   sentence?: { key: string; last: boolean };
 }
 
+type NewEntry = Omit<Entry, 'id'>;
+
 interface Repair {
   clean: number;
   tries: number;
 }
 
 export interface ChunkResult {
+  id: number;
   text: string;
   outcome: Outcome;
   mode: JudgeMode;
   start: number | null;
   perKey: number | null;
+  handoff: boolean | null;
 }
 
 export interface RoundOptions {
@@ -81,6 +92,8 @@ export interface RoundView {
   /** While set, the next segment's name shows and keys are ignored. */
   interstitial: SegmentKind | null;
   mode: JudgeMode;
+  /** The current chunk's id. It stays the same through a repair. */
+  id: number;
   text: string;
   pos: number;
   expected: string;
@@ -90,10 +103,19 @@ export interface RoundView {
   errorTick: number;
   repair: Repair | null;
   prev: { text: string; outcome: Outcome } | null;
-  next: string[];
-  /** True once the first key of the current chunk is down: the next chunk lights up a little. */
-  readAhead: boolean;
+  /**
+   * The chunks after this one (8, or 3 in the Keys warm-up). While the strip shows, these never
+   * change: the list only moves on by one and grows at the end. Only the end of a repair and a
+   * new segment can change it, and both cover the strip.
+   */
+  next: { id: number; text: string }[];
+  /** Chunks finished in this segment, oldest first (a missed chunk shows once, before its repair). */
+  done: readonly ChunkResult[];
+  /** How the chunk after this one lights up right now; null when it does not. */
+  cue: Cue;
   toast: { kind: 'fixed' | 'giveUp'; until: number } | null;
+  /** Just back from the repair bay, nothing typed yet on this chunk: the screen says so. */
+  backFromRepair: boolean;
   paused: boolean;
   finished: boolean;
   activeMs: number;
@@ -104,7 +126,8 @@ export interface RoundView {
   seq: number;
 }
 
-export type KeyResult = 'ignored' | 'correct' | 'wrong' | 'done';
+/** `echo`: a key of the chunk just repaired, typed again by habit; it is not counted (see Round.echo). */
+export type KeyResult = 'ignored' | 'correct' | 'wrong' | 'done' | 'echo';
 
 /** Set challenge ids start with this, so mastery can tell them from normal rounds. */
 export const CHALLENGE_ID_PREFIX = 'ch-';
@@ -138,7 +161,17 @@ export class Round {
   private current!: Entry;
   private upcoming: Entry[] = [];
   private segMode: JudgeMode = 'chunks';
-  private generate: (exclude: Set<string>) => Entry = () => ({ text: 'f', itemKey: null, mode: 'keys' });
+  private generate: (exclude: Set<string>) => NewEntry = () => ({ text: 'f', itemKey: null, mode: 'keys' });
+  private nextId = 0;
+  private segResultStart = 0;
+  /** The next-chunk cue for this segment, set when it starts so it never flickers mid-segment. */
+  private segCue: Cue = null;
+  /** The current chunk has a hunting letter: eyes stay on it, so no cue. */
+  private curHasHunt = false;
+  /** The chunk before this one was typed smooth in this segment, with no repair or pause between. */
+  private handoffPrimed = false;
+  private handoffs = 0;
+  private handoffJudged = 0;
   private chunkInSegment = 0;
 
   private pos = 0;
@@ -150,6 +183,14 @@ export class Round {
   private seq = 0;
   private repair: Repair | null = null;
   private toast: RoundView['toast'] = null;
+  /**
+   * After the repair bay the hands often go on typing the repaired chunk (it was typed 3 times in a
+   * row). While every key so far also spells the repaired chunk again (space included), the retype
+   * stays possible: a key that is right for the next chunk counts for it, but a key that fits only
+   * the retype drops those keys and restarts the next chunk, without a miss. A key that fits only
+   * the next chunk ends the grace; a key that fits neither is a miss as usual.
+   */
+  private echo: { text: string; i: number } | null = null;
 
   /** Count of main (non-repair) chunks finished this round; the n-th chunk has index n. */
   private mainCount = 0;
@@ -194,6 +235,7 @@ export class Round {
       segIndex: this.segIndex,
       interstitial: now < this.interstitialUntil ? this.segments[this.segIndex].kind : null,
       mode: this.current.mode,
+      id: this.current.id,
       text,
       pos: this.pos,
       expected: this.pos < text.length ? text[this.pos] : ' ',
@@ -203,9 +245,14 @@ export class Round {
       prev: this.results.length
         ? { text: this.results[this.results.length - 1].text, outcome: this.results[this.results.length - 1].outcome }
         : null,
-      next: this.peek(2).map((e) => e.text),
-      readAhead: this.pos > 0,
+      next: this.peek(this.segMode === 'keys' ? CONFIG.aheadChunksKeys : CONFIG.aheadChunks).map((e) => ({ id: e.id, text: e.text })),
+      done: this.results.slice(this.segResultStart),
+      cue:
+        this.pos > 0 && !this.repair && !this.paused && !this.finished && now >= this.interstitialUntil && !this.curHasHunt
+          ? this.segCue
+          : null,
       toast: this.toast && now < this.toast.until ? this.toast : null,
+      backFromRepair: this.echo !== null && this.pos === 0 && !this.repair,
       paused: this.paused,
       finished: this.finished,
       activeMs: this.activeMs,
@@ -223,6 +270,21 @@ export class Round {
     const text = this.text();
     const expected = this.pos < text.length ? text[this.pos] : ' ';
     const correct = k === expected;
+    const fitsEcho = !!this.echo && !this.repair && k === this.echo.text[this.echo.i % this.echo.text.length];
+    if (fitsEcho && !correct) {
+      // Only the retype fits: this was the old chunk all along. Any keys taken for this chunk (they
+      // fitted both) are dropped, and the chunk starts over; its wait starts after this key, so it
+      // is not judged slow for the retype.
+      this.echo!.i++;
+      if (this.pos > 0) this.resetChunk(now);
+      this.shownAt = now;
+      this.charSince = now;
+      this.lastKeyAt = now;
+      return 'echo';
+    }
+    // A key that fits both readings counts for this chunk, and the retype stays possible.
+    if (fitsEcho) this.echo!.i++;
+    else this.echo = null;
     this.strokes.push({ index: this.pos, key: k, t: now, correct });
     this.lastKeyAt = now;
     if (!correct) {
@@ -232,6 +294,7 @@ export class Round {
     this.pos++;
     this.charSince = now;
     if (this.pos <= text.length) return 'correct';
+    this.echo = null;
     this.complete(now);
     return 'done';
   }
@@ -250,6 +313,7 @@ export class Round {
     if (this.finished || this.paused) return;
     this.tick(now);
     this.paused = true;
+    this.echo = null;
   }
 
   /** Resume restarts the current chunk so its timing has no pause in it. A miss before the pause still counts. */
@@ -258,6 +322,7 @@ export class Round {
     this.paused = false;
     this.lastTick = now;
     if (!this.repair) this.errorBeforePause ||= this.strokes.some((s) => !s.correct);
+    this.handoffPrimed = false;
     this.resetChunk(now, true);
   }
 
@@ -294,6 +359,8 @@ export class Round {
       slowChunks: [...new Set(this.results.filter((r) => r.outcome === 'slow').map((r) => r.text))],
       flowMedStart: round(median(this.flowStarts)),
       repairs: this.repairs,
+      handoffs: this.handoffs,
+      handoffJudged: this.handoffJudged,
     };
     if (!this.challenge) this.p.rounds.push(this.summary);
     return this.summary;
@@ -316,13 +383,17 @@ export class Round {
       const exclude = new Set(prev ? [prev.text] : []);
       const e = this.generate(exclude);
       if (e.sentence) this.upcoming.push(...this.expandSentence(e));
-      else this.upcoming.push(e);
+      else this.upcoming.push(this.tag(e));
     }
   }
 
-  private expandSentence(e: Entry): Entry[] {
+  private tag(e: NewEntry): Entry {
+    return { ...e, id: ++this.nextId };
+  }
+
+  private expandSentence(e: NewEntry): Entry[] {
     const words = e.text.split(' ');
-    return words.map((w, i) => ({ text: w, itemKey: null, mode: e.mode, sentence: { key: e.sentence!.key, last: i === words.length - 1 } }));
+    return words.map((w, i) => this.tag({ text: w, itemKey: null, mode: e.mode, sentence: { key: e.sentence!.key, last: i === words.length - 1 } }));
   }
 
   private resetChunk(now: number, keepError = false) {
@@ -333,21 +404,28 @@ export class Round {
     this.charSince = now;
     this.lastKeyAt = Math.max(this.lastKeyAt, now);
     if (!keepError) this.errorBeforePause = false;
+    this.curHasHunt = [...this.current.text].some((ch) => ch !== ' ' && letterState(this.p, ch) === 'hunt');
   }
 
   private startSegment(i: number, now: number, withBreak: boolean) {
+    this.echo = null;
     // Revisits already scheduled keep their place when the segment changes.
     const carried = this.upcoming.map((e, idx) => ({ e, idx })).filter((x) => x.e.revisit);
     this.segIndex = i;
     this.segStartMs = this.activeMs;
     this.chunkInSegment = 0;
+    this.segResultStart = this.results.length;
+    this.handoffPrimed = false;
     this.upcoming = [];
     this.configureGenerator(this.segments[i]);
-    this.current = this.generate(new Set());
-    if (this.current.sentence) {
-      const [first, ...rest] = this.expandSentence(this.current);
-      this.current = first;
+    this.segCue = this.segMode === 'keys' ? null : cueFor(this.p, this.handoffKind(this.segMode));
+    const first = this.generate(new Set());
+    if (first.sentence) {
+      const [w, ...rest] = this.expandSentence(first);
+      this.current = w;
       this.upcoming.push(...rest);
+    } else {
+      this.current = this.tag(first);
     }
     for (const { e, idx } of carried) {
       if (idx === 0) {
@@ -463,10 +541,18 @@ export class Round {
 
     const start = m.away ? null : m.startDelay;
     const perKey = m.away ? null : m.perKey;
-    const medianStart = slowBaseline(this.p).start;
+    const base = slowBaseline(this.p);
+    const medianStart = base.start;
     const slow = entry.mode === 'chunks' && clean && this.isSlow(start, perKey);
     const outcome: Outcome = !clean ? 'error' : slow ? 'slow' : 'smooth';
-    this.results.push({ text: entry.text, outcome, mode: entry.mode, start, perKey });
+    const handoff = this.handoffFor(entry, outcome, start, base.perKey);
+    this.handoffPrimed = false;
+    if (handoff !== null) {
+      addHandoff(this.p, this.handoffKind(entry.mode), handoff);
+      this.handoffJudged++;
+      if (handoff) this.handoffs++;
+    }
+    this.results.push({ id: entry.id, text: entry.text, outcome, mode: entry.mode, start, perKey, handoff });
 
     if (clean && !m.away) {
       if (entry.mode === 'chunks') {
@@ -488,15 +574,39 @@ export class Round {
     }
 
     const quickStart = start === null || medianStart === null ? null : start < medianStart;
-    this.emit({ type: outcome, text: entry.text, itemKey: entry.itemKey, segment: entry.mode, start, medianStart, quickStart });
+    this.emit({ type: outcome, text: entry.text, itemKey: entry.itemKey, segment: entry.mode, start, medianStart, quickStart, handoff });
 
-    if (outcome !== 'smooth') {
+    if (outcome === 'error') {
       this.repair = { clean: 0, tries: 0 };
       this.repairs++;
       this.resetChunk(now);
       return;
     }
-    this.advance(now);
+    // Slow but right: no repair bay (being sent back for typing it right feels unfair), it comes
+    // back later in the round instead. A revisit that is slow again is not queued once more.
+    if (outcome === 'slow') {
+      // No repair screen covers the strip here, so the chunks already shown ahead must stay put.
+      if (!entry.revisit) this.scheduleRevisits(entry, CONFIG.revisitAfterSlow, CONFIG.aheadChunks);
+      this.advance(now);
+      return;
+    }
+    this.advance(now, true);
+  }
+
+  private handoffKind(mode: JudgeMode): HandoffKind {
+    return mode === 'flow' ? 'flow' : 'chunks';
+  }
+
+  /**
+   * ⚡: the first key came within handoffFactor x the personal ms per key after the space before it,
+   * so the learner read this chunk while finishing the last one. Judged only for a smooth chunk that
+   * follows a smooth chunk of the same segment (not the first in a segment, not after a repair, a
+   * give-up or a pause), never in the Keys warm-up, never when away, and only once the baseline exists.
+   */
+  private handoffFor(entry: Entry, outcome: Outcome, start: number | null, perKey: number | null): boolean | null {
+    if (outcome !== 'smooth' || entry.mode === 'keys' || !this.handoffPrimed) return null;
+    if (start === null || perKey === null) return null;
+    return start <= CONFIG.handoffFactor * perKey;
   }
 
   private isSlow(start: number | null, perKey: number | null): boolean {
@@ -550,13 +660,19 @@ export class Round {
       this.repair = null;
       this.toast = { kind: 'fixed', until: now + CONFIG.fixedToastMs };
       this.scheduleRevisits(entry, CONFIG.revisitAfterFix);
-      return this.advance(now);
+      // Before advance: a new segment clears it, since the chunk is no longer just behind.
+      this.echo = { text: `${entry.text} `, i: 0 };
+      this.advance(now);
+      return;
     }
     if (r.tries >= CONFIG.repairMaxTries) {
       this.repair = null;
       this.toast = { kind: 'giveUp', until: now + CONFIG.giveUpToastMs };
       this.scheduleRevisits(entry, [CONFIG.revisitAfterGiveUp]);
-      return this.advance(now);
+      // Before advance: a new segment clears it, since the chunk is no longer just behind.
+      this.echo = { text: `${entry.text} `, i: 0 };
+      this.advance(now);
+      return;
     }
     this.resetChunk(now);
   }
@@ -565,26 +681,28 @@ export class Round {
    * Put the chunk back into the queue so that `gap` other chunks come before it.
    * Never inside a sentence, and never next to the same text.
    */
-  private scheduleRevisits(entry: Entry, gaps: readonly number[]) {
-    const revisit: Entry = { text: entry.text, itemKey: entry.itemKey, mode: entry.mode, revisit: true };
-    for (const gap of gaps) this.insertRevisit(revisit, gap);
+  /** `shown`: this many queued chunks are on screen already; nothing is inserted or replaced among them. */
+  private scheduleRevisits(entry: Entry, gaps: readonly number[], shown = 0) {
+    for (const gap of gaps) this.insertRevisit(this.tag({ text: entry.text, itemKey: entry.itemKey, mode: entry.mode, revisit: true }), Math.max(gap, shown), shown);
   }
 
   /** Insert a revisit at queue index `idx` (that many chunks come before it). */
-  private insertRevisit(revisit: Entry, idx: number) {
+  private insertRevisit(revisit: Entry, idx: number, shown = 0) {
     this.fill(idx + 2);
     while (idx < this.upcoming.length && this.upcoming[idx - 1]?.sentence && !this.upcoming[idx - 1].sentence!.last) idx++;
     this.upcoming.splice(idx, 0, revisit);
     for (const j of [idx - 1, idx + 1]) {
+      if (j < shown) continue;
       const nb = this.upcoming[j];
       if (!nb || nb.text !== revisit.text || nb.revisit || nb.sentence) continue;
       const exclude = new Set([revisit.text, this.upcoming[j - 1]?.text, this.upcoming[j + 1]?.text].filter((t): t is string => !!t));
       const replacement = this.generate(exclude);
-      if (!replacement.sentence) this.upcoming[j] = replacement;
+      if (!replacement.sentence) this.upcoming[j] = this.tag(replacement);
     }
   }
 
-  private advance(now: number) {
+  /** `smooth`: the chunk just typed was smooth, so the next one can be judged for ⚡. */
+  private advance(now: number, smooth = false) {
     this.chunkInSegment++;
     if (this.activeMs >= this.limitMs) {
       this.finish();
@@ -599,6 +717,7 @@ export class Round {
     }
     this.fill(1);
     this.current = this.upcoming.shift()!;
+    this.handoffPrimed = smooth;
     this.resetChunk(now);
   }
 

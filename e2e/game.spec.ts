@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { LETTER_PAIRS } from '../src/data/wordlists';
-import { freezeClock, open, practiceStep, testStep, typeChunk } from './helpers';
+import { editProfile, freezeClock, open, practiceStep, testStep, typeChunk } from './helpers';
 
 const xpText = (page: Page) => page.getByTestId('level').getByTestId('xp');
 
@@ -157,30 +157,6 @@ test('an M1 profile gets a head start of 300 XP per round, once', async ({ page 
 });
 
 /** Change the stored profile, as if it had been played this far, then reload. */
-async function editProfile(page: Page, fn: string) {
-  await page.evaluate(
-    (body) =>
-      new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open('level-up-typer');
-        req.onsuccess = () => {
-          const tx = req.result.transaction('kv', 'readwrite');
-          const store = tx.objectStore('kv');
-          const get = store.get('profile-v1');
-          get.onsuccess = () => {
-            const p = get.result;
-            new Function('p', body)(p);
-            store.put(p, 'profile-v1');
-          };
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
-        };
-        req.onerror = () => reject(req.error);
-      }),
-    fn,
-  );
-  await page.reload();
-  await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
-}
 
 test('a set with 8 of 10 mastered can be challenged for a medal (M2b)', async ({ page }) => {
   test.setTimeout(120_000);

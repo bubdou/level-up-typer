@@ -12,6 +12,11 @@ npm run dev        # http://localhost:5173
 
 Add `?minutes=1` to the URL for a short round when trying things out.
 
+## Live site and previews
+
+Cloudflare Pages builds `main` to https://level-up-typer.pages.dev/ and every other pushed branch
+to its own preview address (the branch name with `/` turned into `-`).
+
 ## Checks
 
 ```sh
@@ -40,4 +45,5 @@ PW_WEBKIT=1 npm run e2e   # include WebKit (Safari's engine) locally
   - `challenge.ts` (M2b) set-challenge medals and the usual-pace line for tests.
 - `src/data/wordlists.ts` practice content and its sources.
 - `src/ui/` React screens. All English text is in `src/ui/copy.ts`.
+  - `Tape.tsx` the chunks as still text over two lines; the text moves up a line at a time (read ahead).
 - `src/storage/` saves the profile and, as a separate document, the game state in IndexedDB (localStorage fallback).

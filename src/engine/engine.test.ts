@@ -187,6 +187,86 @@ describe('repair bay', () => {
     expect(r.view(t).toast?.kind).toBe('giveUp');
   });
 
+  it('after the repair bay, typing the repaired chunk again by habit does not count as a miss', () => {
+    let overlaps = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const r = roundOf(newProfile(), { seed });
+      const target = r.view(0).text;
+      let t = typeCurrent(r, 0, { wrong: true });
+      for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+      const v = r.view(t);
+      expect(v.repair).toBeNull();
+      expect(v.backFromRepair).toBe(true);
+      const next = v.text;
+      // the hands go on: the whole repaired chunk once more, with its space, even where its letters
+      // are also right for the next chunk ("it" then "is", "at" then "to")
+      if ([...target].some((c) => c === next[0])) overlaps++;
+      let finished = false;
+      for (const ch of `${target} `) {
+        t += 150;
+        const res = r.key(ch, t);
+        // "the" then "he": the retype's tail is the next chunk itself, so it is simply typed
+        if (res === 'done') finished = true;
+        else expect(['echo', 'correct'], `seed ${seed}`).toContain(res);
+      }
+      if (!finished) {
+        expect(r.view(t).pos, `seed ${seed}`).toBe(0);
+        // then the real chunk: it counts as clean, no new repair
+        t = typeCurrent(r, t);
+      }
+      expect(r.results.at(-1)?.text, `seed ${seed}`).toBe(next);
+      expect(r.results.at(-1)?.outcome, `seed ${seed}`).not.toBe('error');
+      expect(r.view(t).repair, `seed ${seed}`).toBeNull();
+      expect(r.view(t).backFromRepair).toBe(false);
+    }
+    // the seeds include chunks that share letters with the repaired one
+    expect(overlaps).toBeGreaterThan(20);
+  });
+
+  it('after the repair bay, a key that fits both readings counts for the next chunk if the rest does', () => {
+    for (let seed = 1; seed <= 400; seed++) {
+      const r = roundOf(newProfile(), { seed });
+      const target = r.view(0).text;
+      let t = typeCurrent(r, 0, { wrong: true });
+      for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+      const next = r.view(t).text;
+      if (next[0] !== target[0]) continue;
+      // the first key fits both; then the next chunk goes on, so that key was for it all along
+      t = typeCurrent(r, t);
+      expect(r.results.at(-1)?.text, `seed ${seed}`).toBe(next);
+      expect(r.results.at(-1)?.outcome, `seed ${seed}`).not.toBe('error');
+    }
+  });
+
+  it('a repair that ends its segment gives no grace in the next segment', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const r = roundOf(newProfile(), { seed, segments: [{ kind: 'chunks', ms: 3000 }, { kind: 'flow', ms: 60 * 60_000 }] });
+      const target = r.view(0).text;
+      let t = typeCurrent(r, 0, { wrong: true });
+      // slow repair tries: the segment's time runs out during the repair
+      for (let i = 0; i < 3; i++) t = typeCurrent(r, t, { start: 1500 });
+      const v0 = r.view(t);
+      expect(v0.segIndex, `seed ${seed}`).toBe(1);
+      expect(v0.backFromRepair, `seed ${seed}`).toBe(false);
+      if (v0.interstitial) t += CONFIG.segmentBreakMs + 10;
+      const v = r.view(t);
+      expect(v.backFromRepair, `seed ${seed}`).toBe(false);
+      const odd = [...target].find((c) => c !== v.text[0]);
+      if (odd) expect(r.key(odd, (t += 150)), `seed ${seed}`).toBe('wrong');
+    }
+  });
+
+  it('after the repair bay, any other wrong key still counts, and ends the grace', () => {
+    const r = roundOf(newProfile(), { seed: 3 });
+    const target = r.view(0).text;
+    let t = typeCurrent(r, 0, { wrong: true });
+    for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+    const next = r.view(t).text;
+    const odd = [...'zxqjkv'].find((c) => !target.includes(c) && c !== next[0])!;
+    expect(r.key(odd, (t += 150))).toBe('wrong');
+    if (target[0] !== next[0]) expect(r.key(target[0], (t += 150))).toBe('wrong');
+  });
+
   it('does not judge slowness in repair', () => {
     const r = roundOf(withBaseline(newProfile()));
     let t = typeCurrent(r, 0, { wrong: true });
@@ -321,7 +401,31 @@ describe('slow chunks', () => {
     expect(r.view(t).repair).toBeNull();
     t = typeCurrent(r, t, { start: 460 });
     expect(r.results.at(-1)?.outcome).toBe('slow');
-    expect(r.view(t).repair).not.toBeNull();
+    expect(r.view(t).repair).toBeNull();
+  });
+
+  it('sends a slow chunk on, not to repair, and brings it back after the chunks already shown', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const p = withBaseline(newProfile(), 300, 150);
+      const r = roundOf(p, { seed });
+      let t = typeCurrent(r, 0, { start: 300 });
+      const target = r.view(t).text;
+      const before = r.view(t).next.map((n) => `${n.id}:${n.text}`);
+      t = typeCurrent(r, t, { start: 460 });
+      expect(r.results.at(-1)?.outcome, `seed ${seed}`).toBe('slow');
+      const v = r.view(t);
+      expect(v.repair).toBeNull();
+      // the strip only moves on by one: what was shown ahead stays, one new chunk at the end
+      const after = v.next.map((n) => `${n.id}:${n.text}`);
+      expect(`${v.id}:${v.text}`, `seed ${seed}`).toBe(before[0]);
+      expect(after.slice(0, -1), `seed ${seed}`).toEqual(before.slice(1));
+      const seen: string[] = [];
+      for (let i = 0; i < 16; i++) {
+        seen.push(r.view(t).text);
+        t = typeCurrent(r, t, { start: 300 });
+      }
+      expect(seen.slice(8).includes(target), `seed ${seed}`).toBe(true);
+    }
   });
 
   it('judges slow ms per key too', () => {
@@ -806,5 +910,154 @@ describe('content and boundaries', () => {
       expect(src, f).not.toMatch(/from ['"](react|react-dom)|from ['"]\.\.\/(ui|storage)/);
       expect(src, f).not.toMatch(/\bdocument\.|\bwindow\./);
     }
+  });
+});
+
+describe('the strip: chunks ahead keep their ids', () => {
+  it('shows 8 chunks ahead; each step drops the first and adds one at the end', () => {
+    const p = newProfile();
+    const r = roundOf(p, { seed: 3 });
+    let t = 0;
+    let v = r.view(t);
+    expect(v.next).toHaveLength(CONFIG.aheadChunks);
+    for (let i = 0; i < 20; i++) {
+      const before = v;
+      t = typeCurrent(r, t);
+      v = r.view(t);
+      expect(v.id).toBe(before.next[0].id);
+      expect(v.text).toBe(before.next[0].text);
+      expect(v.next.slice(0, -1)).toEqual(before.next.slice(1));
+      expect(v.done.map((d) => d.id).at(-1)).toBe(before.id);
+    }
+    expect(v.done).toHaveLength(20);
+    const ids = [...v.done.map((d) => d.id), v.id, ...v.next.map((n) => n.id)];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('shows only 3 ahead in the Keys warm-up', () => {
+    const p = newProfile();
+    const r = roundOf(p, { segments: [{ kind: 'keys', ms: 60_000 }] });
+    expect(r.view(0).next).toHaveLength(CONFIG.aheadChunksKeys);
+  });
+
+  it('a repair keeps the chunk id; the done list starts over in a new segment', () => {
+    const p = newProfile();
+    const r = roundOf(p, { segments: [{ kind: 'chunks', ms: 3000 }, { kind: 'chunks', ms: 60_000 }] });
+    const id = r.view(0).id;
+    let t = typeCurrent(r, 0, { wrong: true });
+    expect(r.view(t).repair).not.toBeNull();
+    expect(r.view(t).id).toBe(id);
+    for (let i = 0; i < 3; i++) t = typeCurrent(r, t);
+    expect(r.view(t).repair).toBeNull();
+    expect(r.view(t).done.map((d) => d.id)).toEqual([id]);
+    for (let i = 0; i < 20 && r.view(t).segIndex === 0; i++) t = typeCurrent(r, t);
+    t += CONFIG.segmentBreakMs;
+    expect(r.view(t).segIndex).toBe(1);
+    expect(r.view(t).done).toEqual([]);
+  });
+});
+
+describe('⚡ no-stop start', () => {
+  const judged = (p: Profile, starts: number[], opts: { segments?: Segment[] } = {}) => {
+    const events: ChunkEvent[] = [];
+    const r = roundOf(p, { events, segments: opts.segments });
+    let t = 0;
+    for (const start of starts) t = typeCurrent(r, t, { start, gap: 150 });
+    return { r, t, handoffs: events.filter((e) => e.type === 'smooth').map((e) => (e as { handoff: boolean | null }).handoff) };
+  };
+
+  it('is null until the baseline exists', () => {
+    expect(judged(newProfile(), [200, 200]).handoffs).toEqual([null, null]);
+  });
+
+  it('1.4 x ms per key is a ⚡, 1.6 x is not; the first chunk of a segment is never judged', () => {
+    const p = withBaseline(newProfile());
+    const { r, handoffs } = judged(p, [210, 210, 240]);
+    expect(handoffs).toEqual([null, true, false]);
+    const s = r.finish()!;
+    expect(s).toMatchObject({ handoffs: 1, handoffJudged: 2 });
+    expect(p.handoff.chunks).toEqual([true, false]);
+    expect(p.handoff.flow).toEqual([]);
+  });
+
+  it('is not judged after a repair, after a pause, in the Keys warm-up, or on a missed or slow chunk', () => {
+    const p = withBaseline(newProfile());
+    const events: ChunkEvent[] = [];
+    const r = roundOf(p, { events });
+    let t = typeCurrent(r, 0, { start: 210 });
+    t = typeCurrent(r, t, { start: 210, wrong: true });
+    for (let i = 0; i < 3; i++) t = typeCurrent(r, t, { start: 210 });
+    t = typeCurrent(r, t, { start: 210 }); // first after the repair
+    t = typeCurrent(r, t, { start: 210 }); // judged again
+    r.pause(t);
+    r.resume(t + 5000);
+    t = typeCurrent(r, t + 5000, { start: 210 }); // first after the pause
+    t = typeCurrent(r, t, { start: 800 }); // slow
+    const main = events.filter((e) => e.type === 'smooth' || e.type === 'slow' || e.type === 'error') as { type: string; handoff: boolean | null }[];
+    expect(main.map((e) => [e.type, e.handoff])).toEqual([
+      ['smooth', null],
+      ['error', null],
+      ['smooth', null],
+      ['smooth', true],
+      ['smooth', null],
+      ['slow', null],
+    ]);
+    expect(judged(withBaseline(newProfile()), [210, 210], { segments: [{ kind: 'keys', ms: 60_000 }] }).handoffs).toEqual([null, null]);
+  });
+
+  it('keeps the last handoffWindow judgments per kind', () => {
+    const p = withBaseline(newProfile());
+    judged(p, Array(CONFIG.handoffWindow + 10).fill(210));
+    expect(p.handoff.chunks).toHaveLength(CONFIG.handoffWindow);
+  });
+});
+
+describe('next-chunk cue', () => {
+  const withRate = (rate: number, n = 100) => {
+    const p = newProfile();
+    p.handoff.chunks = Array.from({ length: n }, (_, i) => i < rate * n);
+    return p;
+  };
+
+  it('strong under 50% or with fewer than 30 judgments, soft under 70%, off above', () => {
+    const cueAfterFirstKey = (p: Profile) => {
+      const r = roundOf(p);
+      const v = r.view(0);
+      expect(r.view(0).cue).toBeNull();
+      r.key(v.text[0], 300);
+      return r.view(300).cue;
+    };
+    expect(cueAfterFirstKey(withRate(0.4))).toBe('strong');
+    expect(cueAfterFirstKey(withRate(0.6))).toBe('soft');
+    expect(cueAfterFirstKey(withRate(0.8))).toBeNull();
+    expect(cueAfterFirstKey(withRate(0.9, 29))).toBe('strong');
+  });
+
+  it('never shows in the Keys warm-up or a repair, and not when the chunk has a hunting letter', () => {
+    const keys = roundOf(newProfile(), { segments: [{ kind: 'keys', ms: 60_000 }] });
+    keys.key(keys.view(0).text[0], 300);
+    expect(keys.view(300).cue).toBeNull();
+
+    const r = roundOf(newProfile());
+    const t = typeCurrent(r, 0, { wrong: true });
+    r.key(r.view(t).text[0], t + 300);
+    expect(r.view(t + 300).repair).not.toBeNull();
+    expect(r.view(t + 300).cue).toBeNull();
+
+    const p = newProfile();
+    p.testPerKey = Array(10).fill(150);
+    for (const l of 'abcdefghijklmnopqrstuvwxyz') p.letters[l] = { pauses: Array(10).fill(900), knownStreak: 0 };
+    const h = roundOf(p);
+    h.key(h.view(0).text[0], 300);
+    expect(h.view(300).cue).toBeNull();
+  });
+
+  it('keeps its strength for the whole segment', () => {
+    const p = withRate(0.4);
+    const r = roundOf(p);
+    p.handoff.chunks = Array(100).fill(true);
+    const t = typeCurrent(r, 0);
+    r.key(r.view(t).text[0], t + 300);
+    expect(r.view(t + 300).cue).toBe('strong');
   });
 });

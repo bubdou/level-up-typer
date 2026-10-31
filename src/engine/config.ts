@@ -21,6 +21,11 @@ export const CONFIG = {
   revisitAfterFix: [4, 12] as const,
   /** A chunk that was not fixed in 6 tries comes back after this many other chunks. */
   revisitAfterGiveUp: 2,
+  /**
+   * A slow chunk (right keys, long pause) skips the repair bay and comes back after this many.
+   * Never sooner than aheadChunks: the chunks already shown ahead do not change.
+   */
+  revisitAfterSlow: [8, 14] as const,
 
   // --- mastery ---
   /** Smooth in this many different rounds, with no miss in between. */
@@ -84,6 +89,21 @@ export const CONFIG = {
   // --- feedback timing (ms) ---
   fixedToastMs: 800,
   giveUpToastMs: 1200,
+
+  // --- read ahead ---
+  /** Chunks after the current one that the strip can show. */
+  aheadChunks: 8,
+  /** In the Keys warm-up only a few, since its letter groups change with time in the segment. */
+  aheadChunksKeys: 3,
+  /** No-stop start (⚡): the next chunk's first key comes within this many times the personal ms per key. */
+  handoffFactor: 1.5,
+  /** Recent ⚡ judgments kept per kind (chunks and words, flow). */
+  handoffWindow: 100,
+  /** Fewer judgments than this and the next-chunk cue stays strong. */
+  handoffMinJudged: 30,
+  /** ⚡ rate at which the next-chunk cue turns soft, and at which it turns off. */
+  cueSoftAt: 0.5,
+  cueOffAt: 0.7,
 
   // --- set challenge (M2b) ---
   /** A set challenge mixes one set's 10 items for this long. */

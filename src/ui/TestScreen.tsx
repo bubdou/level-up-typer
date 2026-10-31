@@ -99,7 +99,7 @@ export function TestScreen({ profile, go, changed, game, minutes }: ScreenProps 
             <span
               key={err && i === run.pos ? `${i}-${err.tick}` : i}
               className={
-                [i < run.pos ? 'done' : i === run.pos ? (err ? 'at err' : 'at') : '', i === ghost && i !== run.pos ? 'ghost' : '']
+                [ch === ' ' ? 'sp' : '', i < run.pos ? 'done' : i === run.pos ? (err ? 'at err' : 'at') : '', i === ghost && i !== run.pos ? 'ghost' : '']
                   .filter(Boolean)
                   .join(' ') || undefined
               }

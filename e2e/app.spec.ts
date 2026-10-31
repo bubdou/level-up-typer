@@ -66,19 +66,21 @@ test('chunk strip, wrong keys, repair bay and Fixed!', async ({ page }) => {
   await page.keyboard.press('Enter');
   const cur = page.getByTestId('current');
   const text = (await cur.getAttribute('data-text'))!;
-  await expect(page.getByTestId('next').locator('span')).toHaveCount(2);
-  await expect(page.getByTestId('next').locator('.n1')).not.toHaveText('');
+  await expect(page.getByTestId('ahead')).toHaveCount(8);
+  await expect(page.locator('[data-testid="ahead"][data-cue]')).toHaveCount(0);
 
   await page.keyboard.press(wrongFor(text[0]));
   await expect(cur).toHaveAttribute('data-pos', '0');
   await expect(cur.locator('.ch.err')).toHaveCount(1);
   await page.keyboard.press(text[0]);
   await expect(cur).toHaveAttribute('data-pos', '1');
-  await expect(page.getByTestId('next').locator('.n1.lit')).toHaveCount(1);
+  // a new learner: the next chunk lights up strongly once the first key is down
+  await expect(page.getByTestId('ahead').first()).toHaveAttribute('data-cue', 'strong');
   await typeChunk(page);
 
   await expect(page.getByTestId('repair')).toBeVisible();
   await expect(page.getByText('Again! 3 clean in a row')).toBeVisible();
+  await expect(page.getByTestId('repair-why')).toHaveText('There was a wrong key.');
   await expect(cur).toHaveAttribute('data-text', text);
   await typeChunk(page);
   await typeChunk(page);
@@ -86,9 +88,24 @@ test('chunk strip, wrong keys, repair bay and Fixed!', async ({ page }) => {
   await typeChunk(page);
   await expect(page.getByText('Fixed!')).toBeVisible();
   await expect(page.getByTestId('repair')).toHaveCount(0);
-  await expect(page.getByTestId('prev')).toContainText(text);
+  await expect(page.getByTestId('done-chunk').last()).toHaveAttribute('data-text', text);
+  await expect(page.getByTestId('done-chunk').last().locator('.mk')).toHaveText('✕');
   await page.clock.runFor(1000);
   await expect(page.getByText('Fixed!')).toHaveCount(0);
+
+  // the hands go on with the repaired chunk by habit: no red, no new repair, a note says where to type
+  await expect(page.getByText('Back to the line. Type the underlined one.')).toBeVisible();
+  const next = (await cur.getAttribute('data-text'))!;
+  for (const ch of text) {
+    if (ch === next[0]) break;
+    await page.keyboard.press(ch);
+    await expect(cur).toHaveAttribute('data-pos', '0');
+    await expect(cur.locator('.ch.err')).toHaveCount(0);
+  }
+  await typeChunk(page);
+  await expect(page.getByTestId('repair')).toHaveCount(0);
+  await expect(page.getByTestId('done-chunk').last()).toHaveAttribute('data-text', next);
+  await expect(page.getByTestId('done-chunk').last().locator('.mk')).not.toContainText('✕');
 });
 
 test('Esc and leaving the window pause practice; Space goes on', async ({ page }) => {

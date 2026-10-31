@@ -27,6 +27,7 @@ function migrate(raw: unknown): Profile {
     unlocked: { ...fresh.unlocked, ...p.unlocked },
     baseline: { ...fresh.baseline, ...p.baseline },
     testPerKey: p.testPerKey ?? [],
+    handoff: { ...fresh.handoff, ...p.handoff },
   };
 }
 

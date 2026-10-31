@@ -48,6 +48,9 @@ export interface RoundSummary {
   slowChunks: string[];
   flowMedStart: number | null;
   repairs: number;
+  /** No-stop starts (⚡) and how many chunks were judged for one. Missing on older rounds. */
+  handoffs?: number;
+  handoffJudged?: number;
 }
 
 export interface TestRecord {
@@ -87,7 +90,12 @@ export interface Profile {
   rounds: RoundSummary[];
   tests: TestRecord[];
   settings: Settings;
+  /** Recent ⚡ judgments (true = no stop), kept apart for chunks and words, and for flow. */
+  handoff: Record<HandoffKind, boolean[]>;
 }
+
+/** Short chunks are easier to join than flow, so their ⚡ rates are kept apart. */
+export type HandoffKind = 'chunks' | 'flow';
 
 export function newProfile(now = new Date()): Profile {
   return {
@@ -101,6 +109,7 @@ export function newProfile(now = new Date()): Profile {
     pendingTestKeys: [],
     rounds: [],
     tests: [],
+    handoff: { chunks: [], flow: [] },
     settings: { roundMinutes: CONFIG.defaultRoundMinutes, hints: 'auto', choose: null, keyboardHidden: false },
   };
 }
@@ -184,4 +193,20 @@ export function knownShare(p: Profile): number {
 /** Letters for the Keys segment: hunting letters plus the most-missed keys from the last test. */
 export function keysLetters(p: Profile): string[] {
   return [...new Set([...huntLetters(p), ...p.pendingTestKeys.filter((k) => LETTERS.includes(k))])].sort();
+}
+
+export function addHandoff(p: Profile, kind: HandoffKind, value: boolean) {
+  const arr = (p.handoff ??= { chunks: [], flow: [] })[kind];
+  arr.push(value);
+  if (arr.length > CONFIG.handoffWindow) arr.splice(0, arr.length - CONFIG.handoffWindow);
+}
+
+export type Cue = 'strong' | 'soft' | null;
+
+/** How strongly the next chunk lights up, from the recent ⚡ rate. Strong until there is enough data. */
+export function cueFor(p: Profile, kind: HandoffKind): Cue {
+  const arr = p.handoff?.[kind] ?? [];
+  if (arr.length < CONFIG.handoffMinJudged) return 'strong';
+  const rate = arr.filter(Boolean).length / arr.length;
+  return rate < CONFIG.cueSoftAt ? 'strong' : rate < CONFIG.cueOffAt ? 'soft' : null;
 }
