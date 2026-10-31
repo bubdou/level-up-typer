@@ -215,6 +215,24 @@ describe('repair bay', () => {
     }
   });
 
+  it('a repair that ends its segment gives no grace in the next segment', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const r = roundOf(newProfile(), { seed, segments: [{ kind: 'chunks', ms: 3000 }, { kind: 'flow', ms: 60 * 60_000 }] });
+      const target = r.view(0).text;
+      let t = typeCurrent(r, 0, { wrong: true });
+      // slow repair tries: the segment's time runs out during the repair
+      for (let i = 0; i < 3; i++) t = typeCurrent(r, t, { start: 1500 });
+      const v0 = r.view(t);
+      expect(v0.segIndex, `seed ${seed}`).toBe(1);
+      expect(v0.backFromRepair, `seed ${seed}`).toBe(false);
+      if (v0.interstitial) t += CONFIG.segmentBreakMs + 10;
+      const v = r.view(t);
+      expect(v.backFromRepair, `seed ${seed}`).toBe(false);
+      const odd = [...target].find((c) => c !== v.text[0]);
+      if (odd) expect(r.key(odd, (t += 150)), `seed ${seed}`).toBe('wrong');
+    }
+  });
+
   it('after the repair bay, any other wrong key still counts, and ends the grace', () => {
     const r = roundOf(newProfile(), { seed: 3 });
     const target = r.view(0).text;

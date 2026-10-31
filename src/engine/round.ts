@@ -712,16 +712,18 @@ export class Round {
       this.repair = null;
       this.toast = { kind: 'fixed', until: now + CONFIG.fixedToastMs };
       this.scheduleRevisits(entry, CONFIG.revisitAfterFix);
-      this.advance(now);
+      // Before advance: a new segment clears it, since the chunk is no longer just behind.
       this.echo = { text: `${entry.text} `, i: 0 };
+      this.advance(now);
       return;
     }
     if (r.tries >= CONFIG.repairMaxTries) {
       this.repair = null;
       this.toast = { kind: 'giveUp', until: now + CONFIG.giveUpToastMs };
       this.scheduleRevisits(entry, [CONFIG.revisitAfterGiveUp]);
-      this.advance(now);
+      // Before advance: a new segment clears it, since the chunk is no longer just behind.
       this.echo = { text: `${entry.text} `, i: 0 };
+      this.advance(now);
       return;
     }
     this.resetChunk(now);
