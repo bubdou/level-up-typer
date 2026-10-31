@@ -28,6 +28,7 @@ function migrate(raw: unknown): Profile {
     baseline: { ...fresh.baseline, ...p.baseline },
     testPerKey: p.testPerKey ?? [],
     handoff: { ...fresh.handoff, ...p.handoff },
+    stars: { ...fresh.stars, ...p.stars },
   };
 }
 

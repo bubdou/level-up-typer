@@ -46,4 +46,6 @@ PW_WEBKIT=1 npm run e2e   # include WebKit (Safari's engine) locally
 - `src/data/wordlists.ts` practice content and its sources.
 - `src/ui/` React screens. All English text is in `src/ui/copy.ts`.
   - `Tape.tsx` the chunks as still text over two lines; the text moves up a line at a time (read ahead).
+  - `Keyboard.tsx` and `keyboardLayout.ts` the on-screen keyboard that steps away as letters become known.
+  - `Basics.tsx` the first-run cards (sitting, home keys, eyes up).
 - `src/storage/` saves the profile and, as a separate document, the game state in IndexedDB (localStorage fallback).
