@@ -313,28 +313,32 @@ select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid
    at a new line the text moves up one line, so the current line is on top and the next one shows below.
    Each unit (chunk + space) is one line-height tall, with room above the letters for the ✓ ⚡ marks. */
 .tapewin { position: relative; overflow: hidden; height: calc(2 * 1.95em); width: 100%; max-width: 822px; margin: 0 auto; font-size: 34px; font-family: var(--font-key); }
-.tape { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; transition: transform .2s ease-out; }
+.tape { position: relative; display: flex; flex-wrap: wrap; padding-left: .22em; align-items: flex-end; transition: transform .2s ease-out; }
 .tape.instant { transition: none; }
-.tape .unit { display: inline-flex; align-items: baseline; height: 1.95em; padding-top: .6em; box-sizing: border-box; line-height: 1.35; white-space: pre; }
+.tape .unit { position: relative; display: inline-flex; align-items: baseline; height: 1.95em; padding-top: .6em; box-sizing: border-box; line-height: 1.35; white-space: pre; }
+/* The chunk to type now and its space sit on one soft card, so "here" is one look away even when only the
+   space is left. It marks the chunk, not a letter: the letter itself only gets the underline. */
+.tape .unit.cur::before { content: ""; position: absolute; z-index: -1; left: -.2em; right: .08em; top: .58em; bottom: .02em; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 35%, transparent); border-radius: .22em; }
 .tape .w { position: relative; color: var(--muted); border-radius: 6px; white-space: pre; transition: color .15s, background-color .15s, box-shadow .15s; }
 .tape .w.done { color: color-mix(in srgb, var(--ink) 38%, transparent); }
 .tape .w.cur { color: var(--ink); }
-.tape .w.cur .ch { color: var(--ink); border-bottom: 3px solid transparent; }
-.tape .w.cur .ch.done { color: color-mix(in srgb, var(--ink) 45%, transparent); }
+.tape .w.cur .ch { color: var(--ink); border-bottom: 4px solid transparent; }
+.tape .w.cur .ch.done { color: color-mix(in srgb, var(--ink) 50%, transparent); }
 .tape .w.cur .ch.at { border-bottom-color: var(--accent); }
 .tape .w.cur .ch.err { color: var(--bad); border-bottom-color: var(--bad); }
+/* The next-chunk cue says "coming up", in a different look from the card: never blue, never underlined. */
 .tape .w.cue-soft { color: var(--ink); }
-.tape .w.cue-strong { color: var(--ink); background: var(--accent-soft); box-shadow: inset 0 -3px 0 var(--accent); }
+.tape .w.cue-strong { color: var(--ink); text-decoration: underline dotted color-mix(in srgb, var(--muted) 70%, transparent); text-decoration-thickness: 2px; text-underline-offset: .2em; }
 .tapewin.keys .w.later { opacity: .45; }
 .tape .w .mk { position: absolute; left: 50%; top: -.55em; transform: translateX(-50%); font-family: var(--font-ui); font-size: 14px; font-weight: 600; white-space: nowrap; line-height: 1; display: inline-flex; gap: 2px; }
 .mk .good { color: var(--good); } .mk .slow { color: var(--slow); } .mk .bad { color: var(--bad); } .mk .zap { color: var(--slow); }
 .handoffline { font-size: 14px; color: var(--muted); } .handoffline::first-letter { color: var(--slow); }
 
-/* Space: blank. When it is the key to press, a small space-bar shape shows in the gap (red after a miss). */
+/* Space: blank. When it is the key to press, a solid space-bar shape fills the gap (red after a miss). */
 .sp, .ch.isp { position: relative; display: inline-block; }
 .tape .sp { width: 1.5ch; }
-.sp.at::after, .ch.isp.at::after { content: ""; position: absolute; left: .1em; right: .1em; bottom: .16em; height: .26em; border: 3px solid var(--accent); border-radius: .08em; }
-.sp.err::after, .ch.isp.at.err::after { border-color: var(--bad); }
+.sp.at::after, .ch.isp.at::after { content: ""; position: absolute; left: .14em; right: .26em; bottom: .14em; height: .3em; background: var(--accent); border-radius: .08em; }
+.sp.err::after, .ch.isp.at.err::after { background: var(--bad); }
 .tape .w.cur .ch.isp.at, .repair .cur .ch.isp.at { border-bottom-color: transparent; }
 .testtext span.sp { display: inline; }
 .testtext span.sp.at { box-shadow: none; }

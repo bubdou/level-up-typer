@@ -48,8 +48,8 @@ test('the text stays still along a line; at a new line it moves up, so the curre
       // the chunk that was first on the line below is now the current one
       expect(before.ahead[0].top - before.cur.top).toBeGreaterThan(10);
       lineChanges++;
-      // new line: the current chunk is on the first line, at its left edge
-      expect(after.cur.left - after.win.left).toBeLessThanOrEqual(2);
+      // new line: the current chunk is on the first line, at its left edge (past the room for its card)
+      expect(after.cur.left - after.win.left).toBeLessThanOrEqual(10);
     }
     expect(after.cur.top - after.win.top).toBeLessThan((after.win.bottom - after.win.top) / 2);
   }
@@ -123,13 +123,13 @@ test('a space is blank; when it is next a space-bar shape shows, red after a mis
   await expect(page.locator('.tape .sp.at')).toHaveCount(1);
   const shape = await page.evaluate(() => {
     const s = getComputedStyle(document.querySelector('.tape .sp.at')!, '::after');
-    return { content: s.content, border: s.borderTopWidth, color: s.borderTopColor };
+    return { content: s.content, height: parseFloat(s.height), color: s.backgroundColor };
   });
   expect(shape.content).toBe('""');
-  expect(shape.border).toBe('3px');
+  expect(shape.height).toBeGreaterThan(6);
   await page.keyboard.press('q');
   await expect(page.locator('.tape .sp.at.err')).toHaveCount(1);
-  const red = await page.evaluate(() => getComputedStyle(document.querySelector('.tape .sp.at')!, '::after').borderTopColor);
+  const red = await page.evaluate(() => getComputedStyle(document.querySelector('.tape .sp.at')!, '::after').backgroundColor);
   expect(red).not.toBe(shape.color);
   await page.keyboard.press('Space');
   await expect(page.locator('.tape .sp.at')).toHaveCount(0);
