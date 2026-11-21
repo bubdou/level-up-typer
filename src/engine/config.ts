@@ -50,6 +50,15 @@ export const CONFIG = {
   /** Known: median pause below knownFactor x personal ms per key, for knownRoundsNeeded rounds. */
   knownFactor: 1.2,
   knownRoundsNeeded: 2,
+  /**
+   * Absolute limits, so a learner who is slow on every key is not judged against a slow
+   * median of their own (2026-11 review). A letter whose median pause is at or above
+   * huntAlwaysMs is hunting whatever the median; a letter is known only below knownMaxMs.
+   * Pauses are inside a chunk, so word-start planning is not in them. 800 ms is about
+   * 15 wpm on keys inside a word; 400 ms is about 30 wpm. Starting values, tune after play.
+   */
+  huntAlwaysMs: 800,
+  knownMaxMs: 400,
   /** How long before the next key lights up on the on-screen keyboard. */
   hintDelayMs: { hunt: 0, learning: 1000, known: 3000 },
   /** The keyboard fades and shrinks when at least this share of letters is known. */

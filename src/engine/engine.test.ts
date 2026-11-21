@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CHALLENGE_ID_PREFIX,
   CONFIG,
+  LETTERS,
   Round,
   TRACK_ITEMS,
   TestRun,
@@ -13,6 +14,7 @@ import {
   huntLetters,
   itemKey,
   keyboardLevel,
+  knownShare,
   letterState,
   measureChunk,
   newProfile,
@@ -572,6 +574,34 @@ describe('letters and key hints', () => {
     // falls back at once when it gets slow again
     p.letters.e.pauses.push(...Array(10).fill(400));
     expect(letterState(p, 'e')).toBe('learning');
+  });
+
+  it('judges a learner who is slow on every key by absolute limits too', () => {
+    // Looks down for every key: all pauses near 900 ms, so the median is slow as well.
+    const slow = withBaseline(newProfile(), 1500, 900);
+    for (const l of LETTERS) slow.letters[l] = { pauses: Array(10).fill(900), knownStreak: 0 };
+    updateKnownStreaks(slow);
+    updateKnownStreaks(slow);
+    expect(huntLetters(slow)).toEqual([...LETTERS]);
+    expect(knownShare(slow)).toBe(0);
+    expect(keyboardLevel(slow)).toBe('labels');
+
+    // Even and steady but still slow (500 ms): not hunting, and not known yet either.
+    const steady = withBaseline(newProfile(), 900, 500);
+    for (const l of LETTERS) steady.letters[l] = { pauses: Array(10).fill(500), knownStreak: 0 };
+    updateKnownStreaks(steady);
+    updateKnownStreaks(steady);
+    expect(huntLetters(steady)).toEqual([]);
+    expect(knownShare(steady)).toBe(0);
+    expect(keyboardLevel(steady)).toBe('labels');
+
+    // A quick typer is unchanged: 200 ms against a 200 ms median is known.
+    const quick = withBaseline(newProfile(), 300, 200);
+    for (const l of LETTERS) quick.letters[l] = { pauses: Array(10).fill(200), knownStreak: 0 };
+    updateKnownStreaks(quick);
+    updateKnownStreaks(quick);
+    expect(knownShare(quick)).toBe(1);
+    expect(keyboardLevel(quick)).toBe('tucked');
   });
 
   it('uses only the last 10 pauses and needs 5 of them', () => {

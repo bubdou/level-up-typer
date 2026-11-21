@@ -173,8 +173,8 @@ function letterRule(p: Profile, letter: string): { hunt: boolean; knownNow: bool
   if (!rec || rec.pauses.length < CONFIG.letterMinSamples || base === null) return { hunt: false, knownNow: false };
   const m = median(rec.pauses.slice(-CONFIG.letterWindow))!;
   return {
-    hunt: m > CONFIG.huntFactor * base && m > CONFIG.huntFloorMs,
-    knownNow: m < CONFIG.knownFactor * base,
+    hunt: (m > CONFIG.huntFactor * base && m > CONFIG.huntFloorMs) || m >= CONFIG.huntAlwaysMs,
+    knownNow: m < CONFIG.knownFactor * base && m < CONFIG.knownMaxMs,
   };
 }
 
