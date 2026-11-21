@@ -72,6 +72,12 @@ export function Summary({ profile, go, summary, points, game }: ScreenProps & { 
       {!!summary.handoffJudged && (
         <div className="handoffline" data-testid="handoffs">{COPY.summary.handoffs(summary.handoffs ?? 0, summary.handoffJudged)}</div>
       )}
+      {!!summary.starsShown && (
+        <div className="starline" data-testid="stars">
+          {COPY.summary.stars(summary.starsCaught ?? 0, summary.starsShown)}
+          {summary.starsTurnedOff && <> {COPY.summary.starsOff}</>}
+        </div>
+      )}
       {points && (
         <div>
           <div className="label">{COPY.game.newlyMastered}</div>

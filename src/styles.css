@@ -88,10 +88,10 @@ h2 { font-size: 20px; font-weight: 600; margin: 0; }
 .banner.big { font-size: 22px; padding: 22px; }
 
 /* keyboard */
-.kbd { display: flex; flex-direction: column; gap: 6px; align-items: center; font-family: var(--font-key); user-select: none; transition: opacity .3s, transform .3s; }
-.kbd.quiet { opacity: .55; transform: scale(.92); }
+.kbd { position: relative; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font-family: var(--font-key); user-select: none; transition: opacity .2s, transform .2s; }
 .krow { display: flex; gap: 6px; }
-.krow.r2 { margin-left: 22px; } .krow.r3 { margin-left: 50px; }
+/* Rows start where they do on a Mac keyboard: 0.28 and 0.85 of a key to the right (keyboardLayout.ts). */
+.krow.r2 { margin-left: 15px; } .krow.r3 { margin-left: 44px; } .krow.r4 { margin-left: 107px; }
 .key { width: 46px; height: 46px; border-radius: 9px; display: grid; place-items: center; font-size: 16px; font-weight: 500; color: var(--ink); background: var(--bg); border: 1px solid var(--line); position: relative; transition: transform .08s, box-shadow .08s; }
 .key.home::after { content: ""; position: absolute; bottom: 7px; width: 12px; height: 2px; border-radius: 2px; background: var(--muted); }
 .key.space { width: 300px; }
@@ -156,12 +156,15 @@ select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid
 .toggle button { font: inherit; font-size: 13px; border: 0; background: var(--surface); color: var(--muted); padding: 4px 14px; cursor: pointer; }
 .toggle button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
 .headline { font-size: 20px; font-weight: 600; }
+.topbar .quit { align-self: center; white-space: nowrap; }
+.topbar .eschint { font-size: 12px; white-space: nowrap; }
+@media (max-width: 520px) { .topbar .eschint { display: none; } }
 .topbar .mode { color: var(--muted); } .topbar .mode b { color: var(--accent); font-weight: 600; }
 @media (max-width: 700px) {
   .homegrid { grid-template-columns: minmax(0, 1fr); } .big2 b { font-size: 40px; } .testtext { font-size: 18px; }
   .stages, .sumgrid, .two { grid-template-columns: minmax(0, 1fr); }
   .repair .cur { font-size: 44px; } .tapewin { font-size: 26px; }
-  .key { width: 26px; height: 34px; font-size: 12px; border-radius: 6px; } .krow { gap: 3px; } .krow.r2 { margin-left: 12px; } .krow.r3 { margin-left: 26px; } .key.space { width: 160px; }
+  .key { width: 26px; height: 34px; font-size: 12px; border-radius: 6px; } .krow, .kbd { gap: 3px; } .krow.r2 { margin-left: 8px; } .krow.r3 { margin-left: 25px; } .krow.r4 { margin-left: 63px; } .key.space { width: 160px; }
   .phone-note { display: block; }
   .panel { padding: 18px; }
 }
@@ -337,3 +340,26 @@ select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid
 .testtext span.sp.at { box-shadow: none; }
 .testtext span.sp.at::after { left: .06em; right: .06em; }
 .testtext span.sp.err { box-shadow: none; }
+
+/* Eyes up: the keyboard steps away (letters, then colours only, then tucked away until needed). */
+.kbdbox { display: flex; flex-direction: column; gap: 6px; }
+.kbdwrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+.kbdwrap.collapsed .kbd { opacity: 0; transform: translateY(14px) scale(.96); pointer-events: none; }
+.kbdnote { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; text-align: center; padding: 0 12px; }
+.kbdwrap.collapsed .kbdnote { display: flex; }
+.kbd.nolabels .key:not(.space) .lbl { visibility: hidden; }
+.kbd.nolabels .key.wrong .lbl { visibility: visible; }
+.key.rest::before { content: ""; position: absolute; top: 5px; right: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .6; }
+.key.lit { z-index: 1; }
+.key.wrong { box-shadow: 0 0 0 3px var(--bad); color: var(--bad); font-weight: 700; z-index: 1; }
+.key.dim { opacity: .3; }
+.reach { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 2; }
+.finger { margin: 0; font-size: 14px; color: var(--muted); min-height: 1.6em; text-align: center; }
+
+/* Catch the star (Keys warm-up): above the strip, never pushing the text. */
+.star { position: absolute; top: 4px; font-size: 30px; line-height: 1; color: var(--slow); animation: starpop .25s ease-out; pointer-events: none; z-index: 2; }
+.star small { font-family: var(--font-ui); font-size: 12px; font-weight: 600; margin-left: 4px; vertical-align: middle; }
+.star.caught { font-family: var(--font-ui); font-size: 16px; font-weight: 600; color: var(--xp); animation: rise .9s ease-out forwards; }
+@keyframes starpop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.starwarn { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 14px; font-weight: 600; color: var(--slow); }
+.starline { font-size: 14px; color: var(--muted); }

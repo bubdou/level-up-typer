@@ -105,7 +105,7 @@ test('the Collection and Power-ups pages', async ({ page }) => {
   await expect(page.getByTestId('set-detail')).toContainText('Letter pairs, set 1');
 
   await page.getByRole('button', { name: 'Power-ups', exact: true }).click();
-  await expect(page.getByText('Power-ups give points or looks. None of them skip a fix.')).toBeVisible();
+  await expect(page.getByText('Nothing to click here. Each power-up turns on by itself when you reach its level, and works while you practice. None of them skip a fix.')).toBeVisible();
   for (const id of ['combo', 'spark', 'keyFinder', 'flowChain', 'shield']) {
     await expect(page.getByTestId(`pu-${id}`)).toHaveAttribute('data-unlocked', 'false');
   }

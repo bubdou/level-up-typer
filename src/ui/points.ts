@@ -13,6 +13,7 @@ export function pointRows(p: RoundPoints, weekDays: number): [string, string, st
     ['fixed', COPY.game.rows.fixed, COPY.game.times(p.counts.fixed, x.fixed), p.xp.fixed],
     ['fixedLetters', COPY.game.rows.fixedLetters, COPY.game.times(p.counts.fixedLetters ?? 0, x.singleLetterFixed), p.xp.fixedLetters ?? 0],
     ['mastered', COPY.game.rows.mastered, COPY.game.times(p.counts.mastered, x.mastered), p.xp.mastered],
+    ['stars', COPY.game.rows.stars, COPY.game.times(p.counts.stars ?? 0, x.star), p.xp.stars ?? 0],
     ['flowChain', COPY.game.rows.flowChain, COPY.game.times(p.counts.flowChain, GAME_CONFIG.flowChain.xp), p.xp.flowChain],
     ['comboBonus', COPY.game.rows.comboBonus, COPY.game.doubled, p.xp.comboBonus],
     ['keyFinder', COPY.game.rows.keyFinder, p.keysFound.join(' '), p.xp.keyFinder],

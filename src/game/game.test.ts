@@ -638,3 +638,15 @@ describe('usual-pace line (M2b)', () => {
     expect(paceChars(12, 30_000)).toBe(30);
   });
 });
+
+describe('stars (Keys warm-up)', () => {
+  it('a caught star is +5, a missed one nothing, and neither touches Combo', () => {
+    const s = new RoundScorer(L(2));
+    for (let i = 0; i < 3; i++) s.onEvent(ev('smooth'));
+    s.onEvent({ type: 'star', caught: true });
+    s.onEvent({ type: 'star', caught: false });
+    expect(s.xp.stars).toBe(GAME_CONFIG.xp.star);
+    expect(s.counts.stars).toBe(1);
+    expect(s.combo).toBe(3);
+  });
+});

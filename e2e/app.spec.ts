@@ -125,6 +125,24 @@ test('Esc and leaving the window pause practice; Space goes on', async ({ page }
   await expect(page.getByTestId('summary')).toBeVisible();
 });
 
+test('Home in the top bar stops practice or a test in one click; practice so far is saved', async ({ page }) => {
+  await open(page);
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Esc: pause')).toBeVisible();
+  for (let i = 0; i < 3; i++) await typeChunk(page);
+  await page.getByTestId('quit').click();
+  await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
+  await expect(page.getByTestId('summary')).toHaveCount(0);
+  await expect(page.getByTestId('round-xp')).toHaveCount(0);
+  // the round counts: its points are on the Home XP bar
+  await expect(page.getByTestId('xp').first()).not.toHaveText(/^0 \//);
+
+  await page.keyboard.press('t');
+  await expect(page.getByTestId('test')).toBeVisible();
+  await page.getByTestId('quit').click();
+  await expect(page.getByRole('heading', { name: 'Ready to practice?' })).toBeVisible();
+});
+
 test('leaving the window stops a test; it never reaches the chart', async ({ page }) => {
   await open(page);
   await page.keyboard.press('3');

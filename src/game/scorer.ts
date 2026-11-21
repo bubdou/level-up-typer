@@ -25,6 +25,7 @@ const zeroCounts = (): RoundPoints['counts'] => ({
   fixedLetters: 0,
   mastered: 0,
   flowChain: 0,
+  stars: 0,
 });
 const zeroXp = (): RoundPoints['xp'] => ({
   smooth: 0,
@@ -38,6 +39,7 @@ const zeroXp = (): RoundPoints['xp'] => ({
   comboBonus: 0,
   keyFinder: 0,
   weekGoal: 0,
+  stars: 0,
 });
 
 /** A single letter in the Keys warm-up. The word "a" in Chunks or Flow is a whole word and scores as one. */
@@ -157,6 +159,11 @@ export class RoundScorer {
         this.newlyMastered.push(e.text);
         this.pending.mastered = true;
         this.award('mastered', GAME_CONFIG.xp.mastered, 1);
+        break;
+      case 'star':
+        if (!e.caught) break;
+        this.counts.stars++;
+        this.award('stars', GAME_CONFIG.xp.star, 1);
         break;
     }
   }

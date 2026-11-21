@@ -20,6 +20,8 @@ export const GAME_CONFIG = {
     singleLetterFixed: 10,
     /** An item mastered: one more dot filled in the Collection. */
     mastered: 20,
+    /** A star caught with Enter in the Keys warm-up. */
+    star: 5,
     /** Once a week, when the week goal is met. */
     weekGoal: 200,
     /** Head start for each round played before M2. Given once. */

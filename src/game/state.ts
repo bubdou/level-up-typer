@@ -15,6 +15,8 @@ export interface RoundPoints {
     fixedLetters: number;
     mastered: number;
     flowChain: number;
+    /** Stars caught in the Keys warm-up. Missing on rounds from before stars. */
+    stars: number;
   };
   /** XP by source. Smooth and quick are before doubling; comboBonus is what doubling added. */
   xp: {
@@ -29,6 +31,7 @@ export interface RoundPoints {
     comboBonus: number;
     keyFinder: number;
     weekGoal: number;
+    stars: number;
   };
   newlyMastered: string[];
   keysFound: string[];
