@@ -66,7 +66,7 @@ test('chunk strip, wrong keys, repair bay and Fixed!', async ({ page }) => {
   await page.keyboard.press('Enter');
   const cur = page.getByTestId('current');
   const text = (await cur.getAttribute('data-text'))!;
-  await expect(page.getByTestId('ahead')).toHaveCount(8);
+  await expect(page.getByTestId('ahead')).toHaveCount(20);
   await expect(page.locator('[data-testid="ahead"][data-cue]')).toHaveCount(0);
 
   await page.keyboard.press(wrongFor(text[0]));
