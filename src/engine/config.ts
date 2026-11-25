@@ -25,7 +25,7 @@ export const CONFIG = {
    * A slow chunk (right keys, long pause) skips the repair bay and comes back after this many.
    * Never sooner than aheadChunks: the chunks already shown ahead do not change.
    */
-  revisitAfterSlow: [8, 14] as const,
+  revisitAfterSlow: [20, 26] as const,
 
   // --- mastery ---
   /** Smooth in this many different rounds, with no miss in between. */
@@ -106,8 +106,11 @@ export const CONFIG = {
   giveUpToastMs: 1200,
 
   // --- read ahead ---
-  /** Chunks after the current one that the strip can show. */
-  aheadChunks: 8,
+  /**
+   * Chunks after the current one that the strip can show. A line holds 7 to 11 chunks, so 20 fills
+   * the rest of the current line and the line below it (three-line strip, 2026-11-25; was 8).
+   */
+  aheadChunks: 20,
   /** In the Keys warm-up only a few, since its letter groups change with time in the segment. */
   aheadChunksKeys: 3,
   /** No-stop start (⚡): the next chunk's first key comes within this many times the personal ms per key. */

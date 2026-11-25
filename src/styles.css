@@ -312,7 +312,7 @@ select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid
 /* Read ahead: still text over two lines, like a page. Only the underline moves while a line is typed;
    at a new line the text moves up one line, so the current line is on top and the next one shows below.
    Each unit (chunk + space) is one line-height tall, with room above the letters for the ✓ ⚡ marks. */
-.tapewin { position: relative; overflow: hidden; height: calc(2 * 1.95em); width: 100%; max-width: 822px; margin: 0 auto; font-size: 34px; font-family: var(--font-key); }
+.tapewin { position: relative; overflow: hidden; height: calc(3 * 1.95em); width: 100%; max-width: 822px; margin: 0 auto; font-size: 34px; font-family: var(--font-key); }
 .tape { position: relative; display: flex; flex-wrap: wrap; padding-left: .22em; align-items: flex-end; transition: transform .2s ease-out; }
 .tape.instant { transition: none; }
 .tape .unit { position: relative; display: inline-flex; align-items: baseline; height: 1.95em; padding-top: .6em; box-sizing: border-box; line-height: 1.35; white-space: pre; }

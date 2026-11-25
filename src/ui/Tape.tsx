@@ -6,11 +6,16 @@ const MARK: Record<Outcome, string> = { smooth: '✓', slow: '◷', error: '✕'
 const MARK_CLASS: Record<Outcome, string> = { smooth: 'good', slow: 'slow', error: 'bad' };
 
 /**
- * The chunks as still text, wrapped over lines like a page: done ones, the current one, the ones
- * ahead. The text never slides while a line is typed; only the underline moves on. When the current
- * chunk starts a new line, the text moves up one line, so the current line is always the top one
- * and the next line is in view to read ahead. Within a segment chunks are only ever added at the
- * end; the parent remounts the strip for a new segment, which places it at once.
+ * The chunks as still text, wrapped over lines like a page, three lines tall: done ones, the
+ * current one, the ones ahead. The text never moves while a line is typed; only the underline moves
+ * on. The current line is normally the middle one, with the line just typed above it and the next
+ * line below to read ahead.
+ *
+ * At a line break the text stays still and the current chunk is simply the first one on the bottom
+ * line, where the eyes already are, as when reading a book. Only when that first chunk is done does
+ * the text move up one line. So the eyes never jump back to the start of a line while the text is
+ * moving (Wei, 2026-11-25). Within a segment chunks are only ever added at the end; the parent
+ * remounts the strip for a new segment, which places it at once.
  */
 export function Tape({
   done,
@@ -31,12 +36,26 @@ export function Tape({
   const winRef = useRef<HTMLDivElement>(null);
   const tapeRef = useRef<HTMLDivElement>(null);
   const placed = useRef(false);
+  /** Offset (px inside the tape) of the line shown at the top of the window. */
+  const top = useRef(0);
 
+  /**
+   * `instant` places the text at once (first placement, a new width, fonts loaded) and never holds
+   * a line break back. Otherwise a chunk that starts a new line on the bottom row keeps the text
+   * still; the move up comes with the next chunk.
+   */
   const place = (instant: boolean) => {
     const tape = tapeRef.current;
     const cur = tape?.querySelector<HTMLElement>('.unit.cur');
     if (!tape || !cur) return;
-    const y = -cur.offsetTop;
+    const lineH = cur.offsetHeight;
+    const wanted = Math.max(0, cur.offsetTop - lineH);
+    const prev = cur.previousElementSibling as HTMLElement | null;
+    const startsLine = !!prev && prev.offsetTop < cur.offsetTop;
+    const onBottomRow = cur.offsetTop - top.current <= 2 * lineH + 1;
+    const hold = !instant && startsLine && wanted > top.current && onBottomRow;
+    if (!hold) top.current = wanted;
+    const y = -top.current;
     if (tape.style.transform === `translateY(${y}px)`) return;
     if (instant) tape.classList.add('instant');
     tape.style.transform = `translateY(${y}px)`;

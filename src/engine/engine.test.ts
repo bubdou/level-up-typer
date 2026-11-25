@@ -424,11 +424,11 @@ describe('slow chunks', () => {
       expect(`${v.id}:${v.text}`, `seed ${seed}`).toBe(before[0]);
       expect(after.slice(0, -1), `seed ${seed}`).toEqual(before.slice(1));
       const seen: string[] = [];
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < CONFIG.revisitAfterSlow[0] + 8; i++) {
         seen.push(r.view(t).text);
         t = typeCurrent(r, t, { start: 300 });
       }
-      expect(seen.slice(8).includes(target), `seed ${seed}`).toBe(true);
+      expect(seen.slice(CONFIG.aheadChunks).includes(target), `seed ${seed}`).toBe(true);
     }
   });
 

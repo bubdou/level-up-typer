@@ -29,42 +29,49 @@ async function startPractice(page: Page) {
 const inside = (r: { left: number; right: number; top: number; bottom: number }, w: { left: number; right: number; top: number; bottom: number }) =>
   r.left >= w.left - 1 && r.right <= w.right + 1 && r.top >= w.top - 1 && r.bottom <= w.bottom + 1;
 
-test('the text stays still along a line; at a new line it moves up, so the current line is on top', async ({ page }) => {
+test('at a line break the text stays still; it moves up one line after the first chunk of the new line', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await startPractice(page);
-  let lineChanges = 0;
-  for (let i = 0; i < 40 && lineChanges < 2; i++) {
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1;
+  let breaks = 0;
+  let moves = 0;
+  let lastWasBreak = false;
+  for (let i = 0; i < 60 && (breaks < 3 || moves < 1); i++) {
     const before = await geometry(page);
+    const row = (before.win.bottom - before.win.top) / 3;
+    const isBreak = before.ahead[0].top - before.cur.top > 10;
     await typeChunk(page);
     await moveDone(page);
     const after = await geometry(page);
-    // the current line stays on top the whole time
-    expect(Math.abs(after.cur.top - before.cur.top)).toBeLessThanOrEqual(1);
-    if (after.cur.left > before.cur.left) {
-      // same line: nothing moved, the current chunk is simply the next one along
-      expect(Math.abs(after.cur.left - before.ahead[0].left)).toBeLessThanOrEqual(1);
-      expect(Math.abs(after.cur.top - before.ahead[0].top)).toBeLessThanOrEqual(1);
-    } else {
-      // the chunk that was first on the line below is now the current one
-      expect(before.ahead[0].top - before.cur.top).toBeGreaterThan(10);
-      lineChanges++;
-      // new line: the current chunk is on the first line, at its left edge (past the room for its card)
-      expect(after.cur.left - after.win.left).toBeLessThanOrEqual(10);
+    expect(inside(after.cur, after.win), `step ${i}`).toBe(true);
+    expect(near(after.cur.left, before.ahead[0].left), `step ${i}`).toBe(true);
+    if (isBreak) {
+      // the eyes go to the start of the next line and the text does not move under them
+      expect(near(after.cur.top, before.ahead[0].top), `step ${i}`).toBe(true);
+      breaks++;
+    } else if (!near(after.cur.top, before.ahead[0].top)) {
+      // the only move: one line up, right after the first chunk of a new line
+      expect(lastWasBreak, `step ${i}`).toBe(true);
+      expect(Math.abs(before.ahead[0].top - after.cur.top - row), `step ${i}`).toBeLessThanOrEqual(2);
+      moves++;
     }
-    expect(after.cur.top - after.win.top).toBeLessThan((after.win.bottom - after.win.top) / 2);
+    // apart from the chunk right after a break, the current line is one of the top two rows
+    if (!isBreak) expect(after.cur.top - after.win.top, `step ${i}`).toBeLessThan(2 * row);
+    lastWasBreak = isBreak;
   }
-  expect(lineChanges).toBe(2);
+  expect(breaks).toBeGreaterThanOrEqual(3);
+  expect(moves).toBeGreaterThanOrEqual(1);
 });
 
-test('with reduced motion the text moves up at once', async ({ page }) => {
+test('with reduced motion the text moves at once', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await startPractice(page);
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 25; i++) {
     await typeChunk(page);
     const anims = await page.evaluate(() => document.querySelector('.tape')!.getAnimations().length);
     expect(anims).toBe(0);
     const g = await geometry(page);
-    expect(g.cur.top - g.win.top).toBeLessThan((g.win.bottom - g.win.top) / 2);
+    expect(inside(g.cur, g.win)).toBe(true);
   }
 });
 
