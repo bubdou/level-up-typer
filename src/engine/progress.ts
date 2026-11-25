@@ -1,5 +1,6 @@
 import { CONFIG } from './config';
 import type { Profile, RoundSummary, TestRecord } from './profile';
+import { testPoolOf } from './profile';
 import { mean } from './stats';
 
 export interface ChartPoint {
@@ -10,8 +11,16 @@ export interface ChartPoint {
   avg: number;
 }
 
+/** Tests on the current test word list. Older lists had other words, so their speeds don't compare. */
+export const currentPoolTests = (tests: readonly TestRecord[]): TestRecord[] =>
+  tests.filter((t) => testPoolOf(t) === CONFIG.testPool);
+
+/** True when some tests used an older word list and so are left off the chart. */
+export const hasOlderPoolTests = (tests: readonly TestRecord[]): boolean =>
+  tests.some((t) => testPoolOf(t) !== CONFIG.testPool);
+
 export function chartSeries(tests: readonly TestRecord[], minutes: number): ChartPoint[] {
-  const same = tests.filter((t) => t.minutes === minutes).sort((a, b) => a.date.localeCompare(b.date));
+  const same = currentPoolTests(tests).filter((t) => t.minutes === minutes).sort((a, b) => a.date.localeCompare(b.date));
   return same.map((t, i) => ({
     date: t.date,
     wpm: Math.round(t.wpm),

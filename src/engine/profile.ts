@@ -69,7 +69,29 @@ export interface TestRecord {
   wrongKeys: number;
   /** Positions where each expected key was missed at least once. */
   errorsByKey: Record<string, number>;
+  /** The test word list (CONFIG.testPool). Missing on tests from before list 2, which were list 1. */
+  pool?: number;
+  /** Every key press, for the check-up report. Missing on tests from before it was recorded. */
+  log?: TestLog;
 }
+
+/**
+ * Key presses of one test, kept small. Times are ms from the first key press.
+ * `text` is what was typed correctly (the expected characters, spaces included), and `at[i]` is
+ * when `text[i]` was typed. `wrong` lists each wrong key as [position it was aimed at, key, time].
+ *
+ * Example: aiming at "it", pressing u at 0, i at 300, t at 450 gives
+ * text "it", at [300, 450], wrong [[0, "u", 0]].
+ */
+export interface TestLog {
+  v: 1;
+  text: string;
+  at: number[];
+  wrong: [number, string, number][];
+}
+
+/** Which test word list a test used. */
+export const testPoolOf = (t: Pick<TestRecord, 'pool'>): number => t.pool ?? 1;
 
 export type HintMode = 'auto' | 'always' | 'off';
 

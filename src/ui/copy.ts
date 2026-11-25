@@ -149,6 +149,7 @@ export const COPY = {
     oneMore: (min: number) => `Take one more ${min} min test to see your curve.`,
     none: (min: number) => `Take two ${min} min tests to see your curve.`,
     legend: 'Dots are single tests. The thick line is the average of the last 3.',
+    newWords: 'Tests now use new words you have not practiced, so this chart starts fresh. Older tests are kept but not shown.',
     best_label: (n: number) => `best ${n}`,
     accuracy: 'Accuracy',
     min1: '1 min',
@@ -191,6 +192,7 @@ export const COPY = {
       'Short chunks: trigram ranking from 9,481 Project Gutenberg books, plus common word endings.',
       'Common words and More words: the Dolch sight word lists (1936).',
       'Phrases and sentences: written for Level Up Typer.',
+      'Test words: everyday words picked for Level Up Typer, kept apart from all practice words.',
     ],
   },
 

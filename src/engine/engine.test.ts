@@ -11,6 +11,7 @@ import {
   chartHeadline,
   chartSeries,
   compareTest,
+  hasOlderPoolTests,
   huntLetters,
   itemKey,
   keyboardLevel,
@@ -26,7 +27,7 @@ import {
   updateKnownStreaks,
 } from './index';
 import type { ChunkEvent, Profile, Segment } from './index';
-import { COMMON_WORDS, MORE_WORDS, PHRASES, SENTENCES } from '../data/wordlists';
+import { COMMON_WORDS, LETTER_PAIRS, MORE_WORDS, PHRASES, SENTENCES, SHORT_CHUNKS, TEST_WORDS } from '../data/wordlists';
 
 function seeded(seed: number) {
   return () => {
@@ -857,6 +858,40 @@ describe('test mode', () => {
     expect(p.pendingTestKeys.every((k) => /^[a-z]$/.test(k))).toBe(true);
     expect(p.testPerKey.length).toBeGreaterThan(0);
     expect(Object.keys(p.letters).length).toBeGreaterThan(0);
+    // every key press is kept for the check-up report
+    expect(rec.pool).toBe(CONFIG.testPool);
+    expect(rec.log!.text).toHaveLength(240);
+    expect(rec.log!.at).toHaveLength(240);
+    expect(rec.log!.wrong).toHaveLength(rec.wrongKeys);
+  });
+
+  it('logs each key press with times from the first key', () => {
+    const run = new TestRun(1, seeded(2));
+    const want = run.text.slice(0, 3);
+    const wrongKey = want[0] === 'z' ? 'q' : 'z';
+    run.key(wrongKey, 5000);
+    run.key(want[0], 5300);
+    run.key(want[1], 5450);
+    run.key(want[2], 5700);
+    expect(run.log()).toEqual({ v: 1, text: want, at: [300, 450, 700], wrong: [[0, wrongKey, 0]] });
+  });
+
+  it('tests use only words that are never practiced', () => {
+    const practiced = new Set<string>();
+    for (const s of [...LETTER_PAIRS, ...SHORT_CHUNKS, ...COMMON_WORDS, ...MORE_WORDS, ...PHRASES, ...SENTENCES]) {
+      practiced.add(s);
+      for (const w of s.split(' ')) practiced.add(w);
+    }
+    for (const list of Object.values(TRACK_ITEMS)) for (const it of list) practiced.add(it.text);
+    for (const w of TEST_WORDS) {
+      expect(w, w).toMatch(/^[a-z]+$/);
+      expect(practiced.has(w), w).toBe(false);
+    }
+    expect(new Set(TEST_WORDS).size).toBe(TEST_WORDS.length);
+    expect(TEST_WORDS.length).toBeGreaterThanOrEqual(500);
+    expect(new Set(TEST_WORDS.join('')).size).toBe(26);
+    const run = new TestRun(3, seeded(9));
+    for (const w of run.text.split(' ')) expect(practiced.has(w), w).toBe(false);
   });
 
   it('keeps test data out of the slow baseline, so the first round only builds it', () => {
@@ -899,6 +934,19 @@ describe('test mode', () => {
 describe('progress chart', () => {
   const mk = (date: string, minutes: number, wpm: number) => ({
     id: date, date, minutes, wpm, accuracy: 95, correctChars: 0, keystrokes: 0, wrongKeys: 0, errorsByKey: {},
+    pool: CONFIG.testPool,
+  });
+
+  it('starts fresh on a new test word list: older tests stay saved but off the chart', () => {
+    const old = { ...mk('2026-10-01', 1, 30), pool: undefined };
+    const tests = [old, mk('2026-11-26', 1, 15), mk('2026-11-28', 1, 17)];
+    expect(chartSeries(tests, 1).map((p) => p.wpm)).toEqual([15, 17]);
+    expect(chartHeadline(chartSeries(tests, 1))).toEqual({ kind: 'up', wpm: 2 });
+    expect(hasOlderPoolTests(tests)).toBe(true);
+    expect(hasOlderPoolTests(tests.slice(1))).toBe(false);
+    const c = compareTest(tests, tests[1]);
+    expect(c.previous).toBeNull();
+    expect(c.newBest).toBe(false);
   });
 
   it('keeps 1 and 3 minute tests apart and averages the last 3', () => {

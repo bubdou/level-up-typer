@@ -2,8 +2,8 @@ import { CONFIG } from './config';
 import { LETTERS, TEST_POOL } from './content';
 import type { Rng } from './picker';
 import { pickOne } from './picker';
-import type { Profile, TestRecord } from './profile';
-import { addLetterPause, addTestPerKey } from './profile';
+import type { Profile, TestLog, TestRecord } from './profile';
+import { addLetterPause, addTestPerKey, testPoolOf } from './profile';
 import { testScore } from './stats';
 
 export type TestKeyResult = 'ignored' | 'correct' | 'wrong';
@@ -27,6 +27,8 @@ export class TestRun {
   readonly errorsByKey: Record<string, number> = {};
   private missed = new Set<number>();
   private hitAt: number[] = [];
+  /** Wrong presses as [position aimed at, key, time]. */
+  private wrongAt: [number, string, number][] = [];
   private endAt: number | null = null;
   private rng: Rng;
   private lastWord = '';
@@ -63,6 +65,7 @@ export class TestRun {
     if (k !== want) {
       this.wrongKeys++;
       this.errorTick++;
+      this.wrongAt.push([this.pos, k, now]);
       if (!this.missed.has(this.pos)) {
         this.missed.add(this.pos);
         this.errorsByKey[want] = (this.errorsByKey[want] ?? 0) + 1;
@@ -107,6 +110,18 @@ export class TestRun {
       .map(([k]) => k);
   }
 
+  /** Every key press of the test, for the check-up report. Times are ms from the first key. */
+  log(): TestLog {
+    const t0 = this.startAt ?? 0;
+    const rel = (t: number) => Math.round(t - t0);
+    return {
+      v: 1,
+      text: this.text.slice(0, this.pos),
+      at: this.hitAt.slice(0, this.pos).map(rel),
+      wrong: this.wrongAt.filter(([pos]) => pos <= this.pos).map(([pos, key, t]) => [pos, key, rel(t)]),
+    };
+  }
+
   /** Letter pauses and ms per key from clean words. The first test seeds the hunting-letter check. */
   measurements(): { letterPauses: { letter: string; ms: number }[]; perKeys: number[] } {
     const letterPauses: { letter: string; ms: number }[] = [];
@@ -148,6 +163,8 @@ export function saveTest(p: Profile, run: TestRun, wallNow: number = Date.now())
     keystrokes: run.keystrokes,
     wrongKeys: run.wrongKeys,
     errorsByKey: { ...run.errorsByKey },
+    pool: CONFIG.testPool,
+    log: run.log(),
   };
   const m = run.measurements();
   for (const lp of m.letterPauses) addLetterPause(p, lp.letter, lp.ms);
@@ -164,7 +181,9 @@ export interface TestComparison {
 
 /** Compare with earlier tests of the same length. */
 export function compareTest(tests: readonly TestRecord[], record: TestRecord): TestComparison {
-  const same = tests.filter((t) => t.minutes === record.minutes && t.id !== record.id && t.date <= record.date);
+  const same = tests.filter(
+    (t) => t.minutes === record.minutes && testPoolOf(t) === testPoolOf(record) && t.id !== record.id && t.date <= record.date,
+  );
   const previous = same.length ? same[same.length - 1] : null;
   const best = same.length ? Math.max(...same.map((t) => Math.round(t.wpm))) : null;
   return { previous, newBest: best !== null && Math.round(record.wpm) > best };
