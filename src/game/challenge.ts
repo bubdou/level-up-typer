@@ -1,5 +1,5 @@
 import type { RoundSummary, TestRecord } from '../engine';
-import { CONFIG } from '../engine';
+import { CONFIG, currentPoolTests } from '../engine';
 import { GAME_CONFIG } from './config';
 import type { CollectionSet } from './collection';
 import type { RoundScorer } from './scorer';
@@ -80,7 +80,7 @@ export function finishChallenge(
  * with fewer. Pass the tests from before the one being taken.
  */
 export function usualPace(tests: readonly TestRecord[], minutes: number): number | null {
-  const same = tests.filter((t) => t.minutes === minutes).sort((a, b) => a.date.localeCompare(b.date));
+  const same = currentPoolTests(tests).filter((t) => t.minutes === minutes).sort((a, b) => a.date.localeCompare(b.date));
   if (same.length < GAME_CONFIG.paceTests) return null;
   const last = same.slice(-GAME_CONFIG.paceTests);
   return last.reduce((a, t) => a + t.wpm, 0) / last.length;

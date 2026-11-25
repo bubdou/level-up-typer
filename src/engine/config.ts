@@ -145,6 +145,11 @@ export const CONFIG = {
   testDurations: [1, 3] as const,
   testNudgeDays: 3,
   testTopMissedKeys: 3,
+  /**
+   * Which test word list is in use. 1 was the practice words (Common + More). 2 is TEST_WORDS,
+   * words that are never practiced. The chart only compares tests from the same list.
+   */
+  testPool: 2,
   /** The accuracy reference line on the progress chart. Our starting goal, not an industry standard. */
   testAccuracyTarget: 95,
   /** Rolling average window on the progress chart. */

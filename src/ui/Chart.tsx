@@ -1,5 +1,5 @@
 import type { TestRecord } from '../engine';
-import { CONFIG, chartHeadline, chartSeries } from '../engine';
+import { CONFIG, chartHeadline, chartSeries, hasOlderPoolTests } from '../engine';
 import { COPY, fmtDay } from './copy';
 
 interface Props {
@@ -13,6 +13,9 @@ interface Props {
 export function ProgressChart({ tests, minutes, onMinutes, small }: Props) {
   const data = chartSeries(tests, minutes);
   const head = chartHeadline(data);
+  const newWords = hasOlderPoolTests(tests) ? (
+    <p className="note" style={{ margin: 0 }} data-testid="chart-new-words">{COPY.chart.newWords}</p>
+  ) : null;
   const toggle = (
     <span className="toggle">
       {CONFIG.testDurations.map((m) => (
@@ -31,6 +34,7 @@ export function ProgressChart({ tests, minutes, onMinutes, small }: Props) {
           {toggle}
         </div>
         <p className="note">{data.length === 1 ? COPY.chart.oneMore(minutes) : COPY.chart.none(minutes)}</p>
+        {newWords}
       </div>
     );
   }
@@ -80,6 +84,7 @@ export function ProgressChart({ tests, minutes, onMinutes, small }: Props) {
         <text className="tick" x={L} y={T - 4}>wpm</text>
       </svg>
       <p className="note" style={{ margin: 0 }}>{COPY.chart.legend}</p>
+      {newWords}
       {!small && (
         <>
           <span className="label" style={{ marginTop: 10, display: 'block' }}>{COPY.chart.accuracy}</span>

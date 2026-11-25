@@ -1,4 +1,4 @@
-import { COMMON_WORDS, LETTER_PAIRS, MORE_WORDS, PHRASES, SENTENCES, SHORT_CHUNKS } from '../data/wordlists';
+import { COMMON_WORDS, LETTER_PAIRS, MORE_WORDS, PHRASES, SENTENCES, SHORT_CHUNKS, TEST_WORDS } from '../data/wordlists';
 import { CONFIG } from './config';
 
 export type TrackId = 'chunks' | 'words' | 'flow';
@@ -53,9 +53,13 @@ export function unlockedItems(track: TrackId, unlocked: number): { all: Item[]; 
   return { all, latest };
 }
 
-/** The fixed test word pool: Common words and More words. Never depends on training progress. */
-export const TEST_POOL: readonly string[] = [...new Set([...COMMON_WORDS, ...MORE_WORDS])];
+/**
+ * The fixed test word pool (CONFIG.testPool 2): words that are never practiced, so a rising chart
+ * means typing got better, not that the test words were learned. Never depends on training progress.
+ */
+export const TEST_POOL: readonly string[] = TEST_WORDS;
 
-export const WORD_SET: ReadonlySet<string> = new Set(TEST_POOL);
+/** The practice words (Common words and More words). */
+export const WORD_SET: ReadonlySet<string> = new Set([...COMMON_WORDS, ...MORE_WORDS]);
 
 export const LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');

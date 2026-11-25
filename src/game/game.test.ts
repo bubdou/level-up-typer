@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChunkEvent, JudgeMode, Profile, RoundSummary } from '../engine';
-import { ALL_ITEMS, Round, TRACK_ITEMS, newProfile } from '../engine';
+import { ALL_ITEMS, CONFIG, Round, TRACK_ITEMS, newProfile } from '../engine';
 import {
   GAME_CONFIG,
   RoundScorer,
@@ -624,6 +624,13 @@ describe('usual-pace line (M2b)', () => {
     keystrokes: 0,
     wrongKeys: 0,
     errorsByKey: {},
+    pool: CONFIG.testPool,
+  });
+
+  it('leaves out tests on the old word list', () => {
+    const old = [t(1, 30, 1), t(1, 30, 2), t(1, 30, 3)].map((x) => ({ ...x, pool: undefined }));
+    expect(usualPace(old, 1)).toBeNull();
+    expect(usualPace([...old, t(1, 10, 4), t(1, 12, 5), t(1, 14, 6)], 1)).toBe(12);
   });
 
   it('is the average of the last 3 tests of the same length, and hidden with fewer', () => {
